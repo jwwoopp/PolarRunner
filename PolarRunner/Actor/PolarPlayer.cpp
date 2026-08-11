@@ -28,7 +28,7 @@ void PolarPlayer::Tick(float deltaTime)
 		(input.GetKey(VK_RIGHT) ? 1.0f : 0.0f)
 		- (input.GetKey(VK_LEFT) ? 1.0f : 0.0f);
 	// A little inertia keeps the ice feel without taking control away.
-	const float horizontalResponse = horizontalInput == 0.0f ? 7.0f : 11.0f;
+	const float horizontalResponse = horizontalInput == 0.0f ? 10.0f : 11.0f;
 	const float horizontalBlend = (std::min)(horizontalResponse * deltaTime, 1.0f);
 	horizontalVelocity += (horizontalInput * horizontalSpeed - horizontalVelocity)
 		* horizontalBlend;

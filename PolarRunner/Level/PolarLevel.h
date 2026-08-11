@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Game/ObstacleType.h>
 #include <Level/Level.h>
 #include <vector>
 
@@ -14,6 +15,7 @@ public:
 	virtual void Draw() override;
 
 	int DistanceToScreenY(float distance) const;
+	int GetRoadCenterX(int screenY) const;
 	int GetRoadHalfWidth(int screenY) const;
 	int GetRoadScreenX(float horizontalPosition, int screenY) const;
 
@@ -28,6 +30,9 @@ private:
 	void DrawPerspectiveRoad();
 	void DrawHud();
 	void UpdateRunSpeed();
+	void UpdateCurve(float deltaTime);
+	const char* GetObstacleName(ObstacleType type) const;
+	const char* GetCurveDirection() const;
 
 	enum class State { Playing, Crashed, Goal };
 
@@ -37,9 +42,11 @@ private:
 	int playerScreenY = 27;
 	float viewDistance = 100.0f;
 	float runSpeed = 12.0f;
-	float courseDistance = 420.0f;
+	float courseDistance = 500.0f;
 	float traveledDistance = 0.0f;
+	float curveStrength = 0.0f;
 	State state = State::Playing;
+	ObstacleType crashedObstacleType = ObstacleType::LowSpike;
 	std::shared_ptr<PolarPlayer> player;
 	std::vector<std::shared_ptr<PolarObstacle>> obstacles;
 };

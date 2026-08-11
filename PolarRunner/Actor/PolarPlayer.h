@@ -12,12 +12,14 @@ public:
 	virtual void Draw() override;
 
 	inline float GetHorizontalPosition() const { return horizontalPosition; }
+	inline float GetHorizontalHalfWidth() const { return horizontalHalfWidth; }
 	inline bool IsJumping() const { return isJumping; }
 	bool IsAboveObstacle() const;
 	int GetJumpScreenOffset() const;
 
 private:
 	float horizontalPosition = 0.0f;
+	float horizontalHalfWidth = 0.18f;
 	float horizontalVelocity = 0.0f;
 	float horizontalSpeed = 1.8f;
 	bool isJumping = false;

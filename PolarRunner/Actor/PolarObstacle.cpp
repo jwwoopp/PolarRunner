@@ -3,9 +3,11 @@
 #include <Level/PolarLevel.h>
 #include <Render/Renderer.h>
 
-PolarObstacle::PolarObstacle(float horizontalPosition, float distance, ObstacleType type)
+PolarObstacle::PolarObstacle(float horizontalPosition, float distance,
+	ObstacleType type, float horizontalHalfWidth)
 	: Actor("", Craft::Vector2::Zero, Craft::Color::Yellow),
-	  horizontalPosition(horizontalPosition), distance(distance), obstacleType(type)
+	  horizontalPosition(horizontalPosition), distance(distance), obstacleType(type),
+	  horizontalHalfWidth(horizontalHalfWidth)
 {
 }
 

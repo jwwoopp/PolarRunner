@@ -25,34 +25,41 @@ void PolarLevel::OnInitialized()
 
 void PolarLevel::BuildTestCourse()
 {
-	const auto add = [this](float horizontalPosition, float distance, ObstacleType type)
+	// Widths use the same normalized road coordinates as player movement and
+	// match the near-camera four-column spike and eight-column wall sprites.
+	constexpr float spikeHalfWidth = 0.07f;
+	constexpr float wallHalfWidth = 0.13f;
+	const auto add = [this](float horizontalPosition, float distance,
+		ObstacleType type, float horizontalHalfWidth)
 	{
 		obstacles.emplace_back(SpawnActor<PolarObstacle>(
-			horizontalPosition, distance, type));
+			horizontalPosition, distance, type, horizontalHalfWidth));
+	};
+	const auto spike = [&add](float x, float distance)
+	{
+		add(x, distance, ObstacleType::LowSpike, spikeHalfWidth);
+	};
+	const auto wall = [&add](float x, float distance)
+	{
+		add(x, distance, ObstacleType::IceWall, wallHalfWidth);
 	};
 
-	// 1. 점프 학습
-	add(0.0f, 55.0f, ObstacleType::LowSpike);
-	// 2. 좌우 레인 변경 학습
-	add(-0.62f, 95.0f, ObstacleType::IceWall);
-	add(0.62f, 125.0f, ObstacleType::IceWall);
-	// 3. 중앙으로 이동한 뒤 점프해야 하는 판단 패턴
-	add(-0.62f, 165.0f, ObstacleType::IceWall);
-	add(0.0f, 165.0f, ObstacleType::LowSpike);
-	add(0.62f, 165.0f, ObstacleType::IceWall);
-	// 4. 두 레인을 막아 남은 한 레인을 찾게 하는 패턴
-	add(-0.62f, 215.0f, ObstacleType::IceWall);
-	add(0.0f, 215.0f, ObstacleType::IceWall);
-	// 5. 레인 변경 직후 점프
-	add(0.62f, 250.0f, ObstacleType::IceWall);
-	add(0.0f, 268.0f, ObstacleType::LowSpike);
-	// 6. 속도가 빨라진 뒤 중앙 유도와 연속 전환
-	add(-0.62f, 310.0f, ObstacleType::IceWall);
-	add(0.0f, 310.0f, ObstacleType::LowSpike);
-	add(0.62f, 310.0f, ObstacleType::IceWall);
-	add(-0.62f, 350.0f, ObstacleType::IceWall);
-	add(0.62f, 366.0f, ObstacleType::IceWall);
-	add(0.0f, 395.0f, ObstacleType::LowSpike);
+	// Straight: learn one mechanic at a time before the road begins to turn.
+	spike(0.0f, 55.0f);
+	// 70-145: the first left curve is intentionally empty.
+	// Late left curve: introduce one wall only after steering practice.
+	wall(-0.42f, 170.0f);
+	// 215-290: the first part of the right curve is intentionally empty.
+	// Late right curve: two joined walls leave a broad outside corridor.
+	wall(-0.46f, 310.0f);
+	wall(0.0f, 310.0f);
+	// Straight: first composite pattern, with a forced centre jump.
+	wall(-0.52f, 365.0f);
+	spike(0.0f, 365.0f);
+	wall(0.52f, 365.0f);
+	// Gentle S curve: widely spaced single decisions before the goal.
+	wall(0.42f, 420.0f);
+	spike(-0.18f, 470.0f);
 }
 
 void PolarLevel::Tick(float deltaTime)
@@ -71,6 +78,7 @@ void PolarLevel::Tick(float deltaTime)
 		return;
 	}
 
+	UpdateCurve(deltaTime);
 	UpdateRunSpeed();
 	Level::Tick(deltaTime);
 	traveledDistance += runSpeed * deltaTime;
@@ -102,26 +110,29 @@ void PolarLevel::CheckObstacleCollisions()
 			continue;
 		}
 
-		const int obstacleY = DistanceToScreenY(obstacle->GetDistance());
-		// Keep gameplay collision slightly smaller than the visible sprite so
-		// grazing an edge feels fair in the low-resolution console view.
-		const float playerHalfWidth = 0.07f;
-		const float obstacleHalfWidth =
-			obstacle->GetObstacleType() == ObstacleType::IceWall ? 0.12f : 0.06f;
 		const bool horizontalOverlap = std::abs(
 			player->GetHorizontalPosition() - obstacle->GetHorizontalPosition())
-			< playerHalfWidth + obstacleHalfWidth;
+			< player->GetHorizontalHalfWidth()
+				+ obstacle->GetHorizontalHalfWidth();
+		// A world-space interval remains reliable at 18 units/s even if the
+		// renderer skips the exact player row between two frames.
 		const bool reachesPlayer = obstacle->GetDistance() <= 2.0f
-			&& playerScreenY == obstacleY;
+			&& obstacle->GetDistance() >= -2.0f;
 		const bool clearedLowSpike =
 			obstacle->GetObstacleType() == ObstacleType::LowSpike
 			&& player->IsAboveObstacle();
 		if (horizontalOverlap && reachesPlayer && !clearedLowSpike)
 		{
+			crashedObstacleType = obstacle->GetObstacleType();
 			state = State::Crashed;
 			return;
 		}
 	}
+}
+
+const char* PolarLevel::GetObstacleName(ObstacleType type) const
+{
+	return type == ObstacleType::IceWall ? "ICE WALL" : "LOW SPIKE";
 }
 
 int PolarLevel::DistanceToScreenY(float distance) const
@@ -129,6 +140,17 @@ int PolarLevel::DistanceToScreenY(float distance) const
 	const float normalized = std::clamp(1.0f - distance / viewDistance, 0.0f, 1.0f);
 	const float perspective = std::pow(normalized, 1.55f);
 	return horizonY + static_cast<int>(perspective * (playerScreenY - horizonY));
+}
+
+int PolarLevel::GetRoadCenterX(int screenY) const
+{
+	const float nearAmount = std::clamp(
+		static_cast<float>(screenY - horizonY) / (playerScreenY - horizonY),
+		0.0f, 1.0f);
+	const float curvePerspective = std::pow(1.0f - nearAmount, 1.6f);
+	const float maximumCurveOffset = screenWidth * 0.22f;
+	return screenWidth / 2 + static_cast<int>(
+		curveStrength * curvePerspective * maximumCurveOffset);
 }
 
 int PolarLevel::GetRoadHalfWidth(int screenY) const
@@ -142,26 +164,66 @@ int PolarLevel::GetRoadHalfWidth(int screenY) const
 
 int PolarLevel::GetRoadScreenX(float horizontalPosition, int screenY) const
 {
-	const int centerX = screenWidth / 2;
+	const int centerX = GetRoadCenterX(screenY);
 	const int halfWidth = GetRoadHalfWidth(screenY);
 	const int playerMargin = 6;
 	const int usableHalfWidth = (std::max)(0, halfWidth - playerMargin);
 	return centerX + static_cast<int>(horizontalPosition * usableHalfWidth);
 }
 
+void PolarLevel::UpdateCurve(float deltaTime)
+{
+	float targetStrength = 0.0f;
+	if (traveledDistance >= 70.0f && traveledDistance < 145.0f)
+	{
+		targetStrength = -0.60f;
+	}
+	else if (traveledDistance >= 145.0f && traveledDistance < 190.0f)
+	{
+		targetStrength = -0.56f;
+	}
+	else if (traveledDistance >= 215.0f && traveledDistance < 290.0f)
+	{
+		targetStrength = 0.56f;
+	}
+	else if (traveledDistance >= 290.0f && traveledDistance < 330.0f)
+	{
+		targetStrength = 0.60f;
+	}
+	else if (traveledDistance >= 390.0f && traveledDistance < 425.0f)
+	{
+		targetStrength = -0.52f;
+	}
+	else if (traveledDistance >= 425.0f && traveledDistance < 465.0f)
+	{
+		targetStrength = 0.52f;
+	}
+
+	const float blend = (std::min)(deltaTime * 2.8f, 1.0f);
+	curveStrength += (targetStrength - curveStrength) * blend;
+	if (std::abs(curveStrength) < 0.01f && targetStrength == 0.0f)
+	{
+		curveStrength = 0.0f;
+	}
+}
+
+const char* PolarLevel::GetCurveDirection() const
+{
+	if (curveStrength < -0.08f) return "LEFT";
+	if (curveStrength > 0.08f) return "RIGHT";
+	return "STRAIGHT";
+}
+
 void PolarLevel::UpdateRunSpeed()
 {
-	if (traveledDistance < 70.0f) runSpeed = 12.0f;
-	else if (traveledDistance < 150.0f) runSpeed = 14.0f;
-	else if (traveledDistance < 220.0f) runSpeed = 16.0f;
-	else runSpeed = 18.0f;
+	runSpeed = std::abs(curveStrength) > 0.08f ? 12.0f : 14.0f;
 }
 
 void PolarLevel::DrawPerspectiveRoad()
 {
-	const int centerX = screenWidth / 2;
 	for (int y = horizonY; y <= screenHeight - 1; ++y)
 	{
+		const int centerX = GetRoadCenterX(y);
 		const int halfWidth = GetRoadHalfWidth(y);
 		Craft::Renderer::Get().Submit("/", Craft::Vector2(centerX - halfWidth, y),
 			Craft::Color::Cyan, 0);
@@ -181,7 +243,8 @@ void PolarLevel::DrawHud()
 	hud << std::fixed << std::setprecision(1)
 		<< "POLAR RUNNER  DIST: " << traveledDistance
 		<< " / " << courseDistance
-		<< "  SPEED: " << runSpeed;
+		<< "  SPEED: " << runSpeed
+		<< "  ROAD: " << GetCurveDirection();
 	Craft::Renderer::Get().Submit(hud.str(), Craft::Vector2(1, 0),
 		Craft::Color::BrightWhite, 1000);
 	Craft::Renderer::Get().Submit("LEFT/RIGHT: Glide   SPACE: Jump   ESC: Quit",
@@ -189,8 +252,11 @@ void PolarLevel::DrawHud()
 
 	if (state == State::Crashed)
 	{
-		Craft::Renderer::Get().Submit("CRASH!   R : Retry",
-			Craft::Vector2(screenWidth / 2 - 9, screenHeight / 2),
+		const std::string message = std::string("CRASH: ")
+			+ GetObstacleName(crashedObstacleType) + "   R : Retry";
+		Craft::Renderer::Get().Submit(message,
+			Craft::Vector2(screenWidth / 2 - static_cast<int>(message.size()) / 2,
+				screenHeight / 2),
 			Craft::Color::Red, 2000);
 	}
 	else if (state == State::Goal)

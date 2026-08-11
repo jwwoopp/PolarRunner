@@ -10,6 +10,25 @@ class PolarPlayer;
 class PolarLevel : public Craft::Level
 {
 public:
+	enum class TerrainType
+	{
+		Snowfield,
+		LeftCoast,
+		RightCoast,
+		IceCanyon,
+		FrozenLake
+	};
+
+	struct RoadSlice
+	{
+		float distance = 0.0f;
+		float centerOffset = 0.0f;
+		float width = 1.0f;
+		TerrainType terrain = TerrainType::Snowfield;
+		int centerX = 0;
+		int halfWidth = 2;
+	};
+
 	virtual void OnInitialized() override;
 	virtual void Tick(float deltaTime) override;
 	virtual void Draw() override;
@@ -18,35 +37,71 @@ public:
 	int GetRoadCenterX(int screenY) const;
 	int GetRoadHalfWidth(int screenY) const;
 	int GetRoadScreenX(float horizontalPosition, int screenY) const;
+	RoadSlice CalculateRoadSlice(float depth) const;
 
-	inline int GetPlayerScreenY() const { return playerScreenY; }
+	int GetPlayerScreenY() const;
 	inline float GetRunSpeed() const { return runSpeed; }
 	inline float GetViewDistance() const { return viewDistance; }
 	inline bool IsPlaying() const { return state == State::Playing; }
 
 private:
+	float ScreenYToDistance(int screenY) const;
+	float ScreenYToRoadDepth(int screenY) const;
+	RoadSlice GetRoadProfile(float coursePosition) const;
+	void BuildRoadCourse();
 	void BuildTestCourse();
 	void CheckObstacleCollisions();
 	void DrawPerspectiveRoad();
+	void DrawTerrainRow(int y, const RoadSlice& slice);
+	void DrawSnowSurface(int y, int startX, int endX);
+	void DrawOcean(int y, int startX, int endX);
+	void DrawRoadBoundary(const Craft::Vector2& previous,
+		const Craft::Vector2& current, bool leftBoundary);
 	void DrawHud();
+	float GetDisplayDistanceMeters() const;
 	void UpdateRunSpeed();
 	void UpdateCurve(float deltaTime);
+	
+	// 추가
+	void HandleMenuInput();
+	void DrawStartMenu();
+	void DrawPauseMenu();
+	void RetryGame();
+
+	enum class State
+	{
+		StartMenu,
+		Playing,
+		PauseMenu,
+		Crashed,
+		Goal
+	};
+
+	enum class MenuItem
+	{
+		Resume,
+		Retry,
+		Quit,
+		Length
+	};
+	
 	const char* GetObstacleName(ObstacleType type) const;
 	const char* GetCurveDirection() const;
 
-	enum class State { Playing, Crashed, Goal };
 
 	int screenWidth = 80;
 	int screenHeight = 30;
 	int horizonY = 4;
-	int playerScreenY = 27;
+	int playerScreenY = 24;
 	float viewDistance = 100.0f;
-	float runSpeed = 12.0f;
-	float courseDistance = 500.0f;
+	float runSpeed = 16.0f;
+	float courseDistance = 1000.0f;
 	float traveledDistance = 0.0f;
 	float curveStrength = 0.0f;
 	State state = State::Playing;
+	MenuItem selectedMenuItem = MenuItem::Resume;
 	ObstacleType crashedObstacleType = ObstacleType::LowSpike;
 	std::shared_ptr<PolarPlayer> player;
+	std::vector<RoadSlice> roadSlices;
 	std::vector<std::shared_ptr<PolarObstacle>> obstacles;
 };

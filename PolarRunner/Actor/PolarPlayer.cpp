@@ -40,6 +40,14 @@ void PolarPlayer::Tick(float deltaTime)
 		horizontalVelocity = 0.0f;
 	}
 
+	const float longitudinalInput =
+		(input.GetKey(VK_DOWN) ? 1.0f : 0.0f)
+		- (input.GetKey(VK_UP) ? 1.0f : 0.0f);
+	longitudinalScreenOffset = std::clamp(
+		longitudinalScreenOffset
+			+ longitudinalInput * longitudinalSpeed * deltaTime,
+		-8.0f, 4.0f);
+
 	jumpInputBufferRemaining
 		= (std::max)(0.0f, jumpInputBufferRemaining - deltaTime);
 	if (Craft::Input::Get().GetKeyDown(VK_SPACE))
@@ -86,7 +94,7 @@ int PolarPlayer::GetJumpScreenOffset() const
 		return 0;
 	}
 	const float progress = jumpTimer / jumpDuration;
-	return static_cast<int>(std::sin(progress * 3.14159265f) * 4.0f);
+	return static_cast<int>(std::sin(progress * 3.14159265f) * 5.0f);
 }
 
 void PolarPlayer::Draw()

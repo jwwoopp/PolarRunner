@@ -7,7 +7,9 @@ PolarObstacle::PolarObstacle(float horizontalPosition, float distance,
 	ObstacleType type, float horizontalHalfWidth)
 	: Actor("", Craft::Vector2::Zero, Craft::Color::Yellow),
 	  horizontalPosition(horizontalPosition), distance(distance), obstacleType(type),
-	  horizontalHalfWidth(horizontalHalfWidth)
+	  horizontalHalfWidth(horizontalHalfWidth),
+	  visualVariant(static_cast<int>(distance / 10.0f
+		  + (horizontalPosition + 1.0f) * 7.0f) % 3)
 {
 }
 
@@ -42,8 +44,55 @@ void PolarObstacle::Draw()
 	}
 	else
 	{
-		image = closeness > 0.80f ? "########" : (closeness > 0.55f ? "#####" : "###");
 		obstacleColor = Craft::Color::Cyan;
+		const auto drawCentered = [x, y, obstacleColor](
+			const std::string& row, int yOffset)
+		{
+			Craft::Renderer::Get().Submit(row,
+				Craft::Vector2(x - static_cast<int>(row.size()) / 2, y + yOffset),
+				obstacleColor, y + 10);
+		};
+		if (closeness > 0.80f)
+		{
+			if (visualVariant == 0)
+			{
+				drawCentered("/------\\", -2);
+				drawCentered("|######|", -1);
+				image = "|######|";
+			}
+			else if (visualVariant == 1)
+			{
+				drawCentered("/##\\", -3);
+				drawCentered("|##|", -2);
+				drawCentered("|##|", -1);
+				image = "|##|";
+			}
+			else
+			{
+				drawCentered("/^^^^\\", -2);
+				drawCentered("|####|", -1);
+				image = "\\____/";
+			}
+		}
+		else if (closeness > 0.55f)
+		{
+			if (visualVariant == 1)
+			{
+				drawCentered("/\\", -2);
+				drawCentered("||", -1);
+				image = "||";
+			}
+			else
+			{
+				drawCentered(visualVariant == 0 ? "/---\\" : "/^^\\", -1);
+				image = visualVariant == 0 ? "|###|" : "\\__/";
+			}
+		}
+		else
+		{
+			image = visualVariant == 0 ? "[]"
+				: (visualVariant == 1 ? "I" : "<>");
+		}
 	}
 
 	Craft::Renderer::Get().Submit(image,

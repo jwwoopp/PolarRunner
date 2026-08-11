@@ -25,5 +25,6 @@ private:
 	float distance = 0.0f;
 	ObstacleType obstacleType = ObstacleType::LowSpike;
 	float horizontalHalfWidth = 0.0f;
+	int visualVariant = 0;
 	bool hasBeenChecked = false;
 };

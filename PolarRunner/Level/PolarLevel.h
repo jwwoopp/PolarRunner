@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Game/Lane.h>
 #include <Level/Level.h>
 #include <vector>
 
@@ -16,8 +15,7 @@ public:
 
 	int DistanceToScreenY(float distance) const;
 	int GetRoadHalfWidth(int screenY) const;
-	int GetLaneScreenX(Lane lane, int screenY) const;
-	int GetLaneScreenX(float lanePosition, int screenY) const;
+	int GetRoadScreenX(float horizontalPosition, int screenY) const;
 
 	inline int GetPlayerScreenY() const { return playerScreenY; }
 	inline float GetRunSpeed() const { return runSpeed; }

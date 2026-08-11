@@ -25,33 +25,34 @@ void PolarLevel::OnInitialized()
 
 void PolarLevel::BuildTestCourse()
 {
-	const auto add = [this](Lane lane, float distance, ObstacleType type)
+	const auto add = [this](float horizontalPosition, float distance, ObstacleType type)
 	{
-		obstacles.emplace_back(SpawnActor<PolarObstacle>(lane, distance, type));
+		obstacles.emplace_back(SpawnActor<PolarObstacle>(
+			horizontalPosition, distance, type));
 	};
 
 	// 1. 점프 학습
-	add(Lane::Center, 55.0f, ObstacleType::LowSpike);
+	add(0.0f, 55.0f, ObstacleType::LowSpike);
 	// 2. 좌우 레인 변경 학습
-	add(Lane::Left, 95.0f, ObstacleType::IceWall);
-	add(Lane::Right, 125.0f, ObstacleType::IceWall);
+	add(-0.62f, 95.0f, ObstacleType::IceWall);
+	add(0.62f, 125.0f, ObstacleType::IceWall);
 	// 3. 중앙으로 이동한 뒤 점프해야 하는 판단 패턴
-	add(Lane::Left, 165.0f, ObstacleType::IceWall);
-	add(Lane::Center, 165.0f, ObstacleType::LowSpike);
-	add(Lane::Right, 165.0f, ObstacleType::IceWall);
+	add(-0.62f, 165.0f, ObstacleType::IceWall);
+	add(0.0f, 165.0f, ObstacleType::LowSpike);
+	add(0.62f, 165.0f, ObstacleType::IceWall);
 	// 4. 두 레인을 막아 남은 한 레인을 찾게 하는 패턴
-	add(Lane::Left, 215.0f, ObstacleType::IceWall);
-	add(Lane::Center, 215.0f, ObstacleType::IceWall);
+	add(-0.62f, 215.0f, ObstacleType::IceWall);
+	add(0.0f, 215.0f, ObstacleType::IceWall);
 	// 5. 레인 변경 직후 점프
-	add(Lane::Right, 250.0f, ObstacleType::IceWall);
-	add(Lane::Center, 268.0f, ObstacleType::LowSpike);
+	add(0.62f, 250.0f, ObstacleType::IceWall);
+	add(0.0f, 268.0f, ObstacleType::LowSpike);
 	// 6. 속도가 빨라진 뒤 중앙 유도와 연속 전환
-	add(Lane::Left, 310.0f, ObstacleType::IceWall);
-	add(Lane::Center, 310.0f, ObstacleType::LowSpike);
-	add(Lane::Right, 310.0f, ObstacleType::IceWall);
-	add(Lane::Left, 350.0f, ObstacleType::IceWall);
-	add(Lane::Right, 366.0f, ObstacleType::IceWall);
-	add(Lane::Center, 395.0f, ObstacleType::LowSpike);
+	add(-0.62f, 310.0f, ObstacleType::IceWall);
+	add(0.0f, 310.0f, ObstacleType::LowSpike);
+	add(0.62f, 310.0f, ObstacleType::IceWall);
+	add(-0.62f, 350.0f, ObstacleType::IceWall);
+	add(0.62f, 366.0f, ObstacleType::IceWall);
+	add(0.0f, 395.0f, ObstacleType::LowSpike);
 }
 
 void PolarLevel::Tick(float deltaTime)
@@ -88,17 +89,34 @@ void PolarLevel::CheckObstacleCollisions()
 	}
 	for (const std::shared_ptr<PolarObstacle>& obstacle : obstacles)
 	{
-		if (obstacle->HasBeenChecked() || obstacle->GetDistance() > 2.5f)
+		if (obstacle->HasBeenChecked())
 		{
 			continue;
 		}
-		obstacle->MarkChecked();
-		const bool sameLane = obstacle->GetLane() == player->GetLane();
+
+		// DistanceToScreenY clamps passed obstacles to the player's row, so
+		// retire them using world distance instead of their clamped screen Y.
+		if (obstacle->GetDistance() < -2.0f)
+		{
+			obstacle->MarkChecked();
+			continue;
+		}
+
+		const int obstacleY = DistanceToScreenY(obstacle->GetDistance());
+		// Keep gameplay collision slightly smaller than the visible sprite so
+		// grazing an edge feels fair in the low-resolution console view.
+		const float playerHalfWidth = 0.07f;
+		const float obstacleHalfWidth =
+			obstacle->GetObstacleType() == ObstacleType::IceWall ? 0.12f : 0.06f;
+		const bool horizontalOverlap = std::abs(
+			player->GetHorizontalPosition() - obstacle->GetHorizontalPosition())
+			< playerHalfWidth + obstacleHalfWidth;
+		const bool reachesPlayer = obstacle->GetDistance() <= 2.0f
+			&& playerScreenY == obstacleY;
 		const bool clearedLowSpike =
 			obstacle->GetObstacleType() == ObstacleType::LowSpike
 			&& player->IsAboveObstacle();
-		if (obstacle->GetDistance() >= -2.0f
-			&& sameLane && !clearedLowSpike)
+		if (horizontalOverlap && reachesPlayer && !clearedLowSpike)
 		{
 			state = State::Crashed;
 			return;
@@ -122,17 +140,13 @@ int PolarLevel::GetRoadHalfWidth(int screenY) const
 	return 2 + static_cast<int>(normalized * (nearHalfWidth - 2));
 }
 
-int PolarLevel::GetLaneScreenX(Lane lane, int screenY) const
-{
-	return GetLaneScreenX(static_cast<float>(static_cast<int>(lane)), screenY);
-}
-
-int PolarLevel::GetLaneScreenX(float lanePosition, int screenY) const
+int PolarLevel::GetRoadScreenX(float horizontalPosition, int screenY) const
 {
 	const int centerX = screenWidth / 2;
 	const int halfWidth = GetRoadHalfWidth(screenY);
-	const float laneOffset = lanePosition * halfWidth * 0.55f;
-	return centerX + static_cast<int>(laneOffset);
+	const int playerMargin = 6;
+	const int usableHalfWidth = (std::max)(0, halfWidth - playerMargin);
+	return centerX + static_cast<int>(horizontalPosition * usableHalfWidth);
 }
 
 void PolarLevel::UpdateRunSpeed()
@@ -170,7 +184,7 @@ void PolarLevel::DrawHud()
 		<< "  SPEED: " << runSpeed;
 	Craft::Renderer::Get().Submit(hud.str(), Craft::Vector2(1, 0),
 		Craft::Color::BrightWhite, 1000);
-	Craft::Renderer::Get().Submit("LEFT/RIGHT: Lane   SPACE: Jump   ESC: Quit",
+	Craft::Renderer::Get().Submit("LEFT/RIGHT: Glide   SPACE: Jump   ESC: Quit",
 		Craft::Vector2(1, 1), Craft::Color::Cyan, 1000);
 
 	if (state == State::Crashed)

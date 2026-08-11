@@ -3,9 +3,9 @@
 #include <Level/PolarLevel.h>
 #include <Render/Renderer.h>
 
-PolarObstacle::PolarObstacle(Lane lane, float distance, ObstacleType type)
+PolarObstacle::PolarObstacle(float horizontalPosition, float distance, ObstacleType type)
 	: Actor("", Craft::Vector2::Zero, Craft::Color::Yellow),
-	  lane(lane), distance(distance), obstacleType(type)
+	  horizontalPosition(horizontalPosition), distance(distance), obstacleType(type)
 {
 }
 
@@ -30,7 +30,7 @@ void PolarObstacle::Draw()
 	}
 
 	const int y = level->DistanceToScreenY(distance);
-	const int x = level->GetLaneScreenX(lane, y);
+	const int x = level->GetRoadScreenX(horizontalPosition, y);
 	const float closeness = 1.0f - distance / level->GetViewDistance();
 	std::string image;
 	Craft::Color obstacleColor = Craft::Color::Yellow;

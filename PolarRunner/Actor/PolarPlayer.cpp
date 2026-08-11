@@ -23,27 +23,21 @@ void PolarPlayer::Tick(float deltaTime)
 		return;
 	}
 
-	if (Craft::Input::Get().GetKeyDown(VK_LEFT)
-		&& lane != Lane::Left)
-	{
-		laneMoveStart = visualLanePosition;
-		laneMoveElapsed = 0.0f;
-		lane = static_cast<Lane>(static_cast<int>(lane) - 1);
-	}
-	else if (Craft::Input::Get().GetKeyDown(VK_RIGHT)
-		&& lane != Lane::Right)
-	{
-		laneMoveStart = visualLanePosition;
-		laneMoveElapsed = 0.0f;
-		lane = static_cast<Lane>(static_cast<int>(lane) + 1);
-	}
+	const Craft::Input& input = Craft::Input::Get();
+	const float horizontalInput =
+		(input.GetKey(VK_RIGHT) ? 1.0f : 0.0f)
+		- (input.GetKey(VK_LEFT) ? 1.0f : 0.0f);
+	// A little inertia keeps the ice feel without taking control away.
+	const float horizontalResponse = horizontalInput == 0.0f ? 7.0f : 11.0f;
+	const float horizontalBlend = (std::min)(horizontalResponse * deltaTime, 1.0f);
+	horizontalVelocity += (horizontalInput * horizontalSpeed - horizontalVelocity)
+		* horizontalBlend;
 
-	const float targetLane = static_cast<float>(static_cast<int>(lane));
-	if (visualLanePosition != targetLane)
+	horizontalPosition = std::clamp(
+		horizontalPosition + horizontalVelocity * deltaTime, -1.0f, 1.0f);
+	if (horizontalPosition == -1.0f || horizontalPosition == 1.0f)
 	{
-		laneMoveElapsed += deltaTime;
-		const float progress = (std::min)(laneMoveElapsed / laneMoveDuration, 1.0f);
-		visualLanePosition = laneMoveStart + (targetLane - laneMoveStart) * progress;
+		horizontalVelocity = 0.0f;
 	}
 
 	jumpInputBufferRemaining
@@ -104,9 +98,9 @@ void PolarPlayer::Draw()
 		return;
 	}
 
-	const int y = level->GetPlayerScreenY() - GetJumpScreenOffset();
-	const int x = level->GetLaneScreenX(
-		visualLanePosition, level->GetPlayerScreenY());
+	const int screenY = level->GetPlayerScreenY();
+	const int y = screenY - GetJumpScreenOffset();
+	const int x = level->GetRoadScreenX(horizontalPosition, screenY);
 	if (isJumping)
 	{
 		Craft::Renderer::Get().Submit(" _~_ ", Craft::Vector2(x - 2, y - 4), Craft::Color::Cyan, 100);

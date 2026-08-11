@@ -13,10 +13,11 @@ public:
 	enum class TerrainType
 	{
 		Snowfield,
-		LeftCoast,
-		RightCoast,
-		IceCanyon,
-		FrozenLake
+		Coast,
+		Canyon,
+		NarrowIcePath,
+		BrokenIce,
+		ResearchBase
 	};
 
 	struct RoadSlice
@@ -38,6 +39,8 @@ public:
 	int GetRoadHalfWidth(int screenY) const;
 	int GetRoadScreenX(float horizontalPosition, int screenY) const;
 	RoadSlice CalculateRoadSlice(float depth) const;
+	float GetPlayerHorizontalMin() const;
+	float GetPlayerHorizontalMax() const;
 
 	int GetPlayerScreenY() const;
 	inline float GetRunSpeed() const { return runSpeed; }
@@ -51,15 +54,23 @@ private:
 	void BuildRoadCourse();
 	void BuildTestCourse();
 	void CheckObstacleCollisions();
+	void CheckTerrainHazards();
+	void DrawSkyAndHorizon();
 	void DrawPerspectiveRoad();
-	void DrawTerrainRow(int y, const RoadSlice& slice);
+	void DrawSnowfieldRow(int y, float depth, const RoadSlice& slice);
+	void DrawCoastRow(int y, float depth, const RoadSlice& slice);
+	void DrawCanyonRow(int y, float depth, const RoadSlice& slice);
+	void DrawNarrowIcePathRow(int y, float depth, const RoadSlice& slice);
+	void DrawBrokenIceRow(int y, float depth, const RoadSlice& slice);
+	void DrawResearchBaseRow(int y, float depth, const RoadSlice& slice);
 	void DrawSnowSurface(int y, int startX, int endX);
 	void DrawOcean(int y, int startX, int endX);
-	void DrawRoadBoundary(const Craft::Vector2& previous,
-		const Craft::Vector2& current, bool leftBoundary);
+	void DrawCanyonWall(int y, int startX, int endX);
+	void DrawBrokenIce(int y, int startX, int endX);
+	void DrawResearchBase(int y, int startX, int endX);
 	void DrawHud();
 	float GetDisplayDistanceMeters() const;
-	void UpdateRunSpeed();
+	void UpdateRunSpeed(float deltaTime);
 	void UpdateCurve(float deltaTime);
 	
 	// 추가
@@ -91,16 +102,18 @@ private:
 
 	int screenWidth = 80;
 	int screenHeight = 30;
-	int horizonY = 4;
+	int horizonY = 7;
 	int playerScreenY = 24;
 	float viewDistance = 100.0f;
 	float runSpeed = 16.0f;
 	float courseDistance = 1000.0f;
 	float traveledDistance = 0.0f;
 	float curveStrength = 0.0f;
-	State state = State::Playing;
+	State state = State::StartMenu;
 	MenuItem selectedMenuItem = MenuItem::Resume;
 	ObstacleType crashedObstacleType = ObstacleType::LowSpike;
+	bool fellFromNarrowIcePath = false;
+	bool fellThroughBrokenBridge = false;
 	std::shared_ptr<PolarPlayer> player;
 	std::vector<RoadSlice> roadSlices;
 	std::vector<std::shared_ptr<PolarObstacle>> obstacles;

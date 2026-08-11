@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
+#include <random>
 #include <sstream>
 
 void PolarLevel::OnInitialized()
@@ -17,7 +18,7 @@ void PolarLevel::OnInitialized()
 	Level::OnInitialized();
 	screenWidth = Craft::Engine::Get().GetWidth();
 	screenHeight = Craft::Engine::Get().GetHeight();
-	horizonY = 4;
+	horizonY = 7;
 	playerScreenY = screenHeight - 6;
 	player = SpawnActor<PolarPlayer>();
 	BuildRoadCourse();
@@ -26,17 +27,45 @@ void PolarLevel::OnInitialized()
 
 void PolarLevel::BuildRoadCourse()
 {
-	// Distance, horizontal curve offset, and width scale. Closely spaced slices
-	// create short, readable transitions between terrain types.
-	roadSlices = {
-		{ 0.0f, 0.0f, 1.00f, TerrainType::Snowfield },
-		{ 150.0f, -0.40f, 0.85f, TerrainType::LeftCoast },
-		{ 300.0f, 0.0f, 0.70f, TerrainType::Snowfield },
-		{ 450.0f, 0.40f, 0.85f, TerrainType::RightCoast },
-		{ 600.0f, 0.0f, 1.35f, TerrainType::Snowfield },
-		{ 750.0f, -0.30f, 1.00f, TerrainType::LeftCoast },
-		{ 850.0f, 0.30f, 0.90f, TerrainType::RightCoast },
-		{ 1000.0f, 0.0f, 1.20f, TerrainType::Snowfield }
+	roadSlices =
+	{
+		// 넓은 시작 설원
+		{ 0.0f,    0.00f, 1.25f, TerrainType::Snowfield },
+		{ 40.0f,   0.00f, 1.25f, TerrainType::Snowfield },
+
+		// 왼쪽 해안
+		{ 80.0f,  -0.55f, 0.90f, TerrainType::Coast },
+		{ 150.0f, -0.55f, 0.82f, TerrainType::Coast },
+
+		// 오른쪽으로 꺾이는 협곡
+		{ 180.0f,  0.10f, 0.65f, TerrainType::Canyon },
+		{ 230.0f,  0.60f, 0.55f, TerrainType::Canyon },
+
+		// 반대 방향 깨진 빙판
+		{ 260.0f,  0.00f, 0.95f, TerrainType::BrokenIce },
+		{ 300.0f, -0.60f, 0.88f, TerrainType::BrokenIce },
+		{ 360.0f, -0.60f, 0.92f, TerrainType::BrokenIce },
+
+		// 연구기지 S자 구간
+		{ 400.0f,  0.00f, 1.05f, TerrainType::ResearchBase },
+		{ 440.0f,  0.60f, 0.92f, TerrainType::ResearchBase },
+		{ 490.0f, -0.60f, 0.88f, TerrainType::ResearchBase },
+		{ 540.0f,  0.55f, 0.92f, TerrainType::ResearchBase },
+
+		// 넓은 설원
+		{ 580.0f,  0.00f, 1.30f, TerrainType::Snowfield },
+		{ 650.0f, -0.45f, 1.15f, TerrainType::Snowfield },
+		{ 710.0f,  0.45f, 1.10f, TerrainType::Snowfield },
+
+		// 좁은 얼음다리
+		{ 750.0f,  0.00f, 0.55f, TerrainType::NarrowIcePath },
+		{ 810.0f, -0.25f, 0.40f, TerrainType::NarrowIcePath },
+		{ 870.0f,  0.25f, 0.40f, TerrainType::NarrowIcePath },
+
+		// 북극 도착 구간
+		{ 900.0f,  0.00f, 1.10f, TerrainType::Snowfield },
+		{ 950.0f, -0.35f, 1.20f, TerrainType::Snowfield },
+		{ 1000.0f, 0.00f, 1.35f, TerrainType::Snowfield }
 	};
 }
 
@@ -60,33 +89,47 @@ void PolarLevel::BuildTestCourse()
 	{
 		add(x, distance, ObstacleType::IceWall, wallHalfWidth);
 	};
+	const auto brokenBridge = [&add](float distance)
+	{
+		add(0.0f, distance, ObstacleType::BrokenBridge, 1.0f);
+	};
 
-	// Straight: learn one mechanic at a time before the road begins to turn.
+	// Keep the first obstacle fixed so every run teaches jumping before random
+	// decisions begin.
 	spike(0.0f, 55.0f);
-	// 70-145: the first left curve is intentionally empty.
-	// Late left curve: introduce one wall only after steering practice.
-	wall(-0.42f, 170.0f);
-	// 215-290: the first part of the right curve is intentionally empty.
-	// Late right curve: two joined walls leave a broad outside corridor.
-	wall(-0.46f, 310.0f);
-	wall(0.0f, 310.0f);
-	// Straight: first composite pattern, with a forced centre jump.
-	wall(-0.52f, 365.0f);
-	spike(0.0f, 365.0f);
-	wall(0.52f, 365.0f);
-	// Gentle S curve: widely spaced single decisions before the goal.
-	wall(0.42f, 420.0f);
-	spike(-0.18f, 470.0f);
 
-	// Continue the obstacle course through the second half of the 1000m run.
-	spike(0.12f, 540.0f);
-	wall(-0.45f, 610.0f);
-	wall(0.35f, 680.0f);
-	spike(-0.20f, 755.0f);
-	wall(-0.50f, 825.0f);
-	wall(0.05f, 825.0f);
-	spike(0.25f, 900.0f);
-	wall(0.40f, 955.0f);
+	std::random_device seed;
+	std::mt19937 random(seed());
+	const float lanes[] = { -0.55f, 0.0f, 0.55f };
+	std::uniform_int_distribution<int> laneChoice(0, 2);
+	std::uniform_int_distribution<int> typeChoice(0, 1);
+	std::uniform_real_distribution<float> spacingChoice(48.0f, 72.0f);
+
+	// One obstacle per distance guarantees at least two lateral escape routes.
+	// Spacing is also randomized, so Retry produces a different rhythm.
+	for (float distance = 125.0f; distance < 730.0f;
+		distance += spacingChoice(random))
+	{
+		const float lane = lanes[laneChoice(random)];
+		if (typeChoice(random) == 0)
+		{
+			spike(lane, distance);
+		}
+		else
+		{
+			wall(lane, distance);
+		}
+	}
+
+	// Broken bridges stay inside the narrow-path section, but their exact
+	// positions vary while retaining enough recovery distance between jumps.
+	std::uniform_real_distribution<float> bridgeJitter(-8.0f, 8.0f);
+	brokenBridge(790.0f + bridgeJitter(random));
+	brokenBridge(850.0f + bridgeJitter(random));
+
+	std::uniform_real_distribution<float> finalLane(-0.55f, 0.55f);
+	spike(finalLane(random), 915.0f);
+	wall(finalLane(random), 965.0f);
 }
 
 void PolarLevel::Tick(float deltaTime)
@@ -98,9 +141,10 @@ void PolarLevel::Tick(float deltaTime)
 	}
 
 	UpdateCurve(deltaTime);
-	UpdateRunSpeed();
+	UpdateRunSpeed(deltaTime);
 	Level::Tick(deltaTime);
 	traveledDistance += runSpeed * deltaTime;
+	CheckTerrainHazards();
 	CheckObstacleCollisions();
 	if (traveledDistance >= courseDistance && IsPlaying())
 	{
@@ -123,39 +167,66 @@ void PolarLevel::CheckObstacleCollisions()
 
 		const int obstacleScreenY = DistanceToScreenY(obstacle->GetDistance());
 		const int currentPlayerScreenY = GetPlayerScreenY();
+		const bool isBrokenBridge =
+			obstacle->GetObstacleType() == ObstacleType::BrokenBridge;
+		const int contactScreenY = isBrokenBridge
+			? obstacleScreenY - 1
+			: obstacleScreenY;
 		// Once an obstacle has visibly passed the player's current row it must
 		// not become dangerous again if the player moves backward.
-		if (obstacleScreenY > currentPlayerScreenY + 1
+		if (contactScreenY > currentPlayerScreenY + 1
 			|| obstacle->GetDistance() < -2.0f)
 		{
 			obstacle->MarkChecked();
 			continue;
 		}
 
-		const int playerScreenX = GetRoadScreenX(
-			player->GetHorizontalPosition(), currentPlayerScreenY);
-		const int obstacleScreenX = GetRoadScreenX(
-			obstacle->GetHorizontalPosition(), obstacleScreenY);
-		const int collisionRoadScale = (std::max)(0,
-			GetRoadHalfWidth(currentPlayerScreenY) - 6);
-		const float combinedHalfWidth =
-			(player->GetHorizontalHalfWidth()
-				+ obstacle->GetHorizontalHalfWidth()) * collisionRoadScale;
+		// Compare positions in the shared road coordinate system. Comparing two
+		// projected screen X values made nearby rows diverge on curved roads.
+		const float combinedHalfWidth = player->GetHorizontalHalfWidth()
+			+ obstacle->GetHorizontalHalfWidth();
 		const bool horizontalOverlap =
-			std::abs(playerScreenX - obstacleScreenX) < combinedHalfWidth;
+			std::abs(player->GetHorizontalPosition()
+				- obstacle->GetHorizontalPosition()) < combinedHalfWidth;
 		// Collision follows the player's movable screen row. A one-row window
 		// prevents a fast obstacle from slipping through between rendered rows.
-		const bool reachesPlayer =
-			std::abs(obstacleScreenY - currentPlayerScreenY) <= 1;
+		const bool reachesPlayer = isBrokenBridge
+			? contactScreenY >= currentPlayerScreenY
+				&& contactScreenY <= currentPlayerScreenY + 1
+			: std::abs(contactScreenY - currentPlayerScreenY) <= 1;
 		const bool clearedLowSpike =
 			obstacle->GetObstacleType() == ObstacleType::LowSpike
 			&& player->IsAboveObstacle();
-		if (horizontalOverlap && reachesPlayer && !clearedLowSpike)
+		// The upright airborne pose must agree with the gameplay result. Bridge
+		// gaps require a jump state, while low spikes still require real height.
+		const bool jumpIntent = player->IsJumping()
+			|| Craft::Input::Get().GetKey(VK_SPACE)
+			|| Craft::Input::Get().GetKeyDown(VK_SPACE);
+		const bool clearedBrokenBridge = isBrokenBridge && jumpIntent;
+		if ((isBrokenBridge || horizontalOverlap) && reachesPlayer
+			&& !clearedLowSpike && !clearedBrokenBridge)
 		{
 			crashedObstacleType = obstacle->GetObstacleType();
+			fellThroughBrokenBridge = isBrokenBridge;
 			state = State::Crashed;
 			return;
 		}
+	}
+}
+
+void PolarLevel::CheckTerrainHazards()
+{
+	if (!player || GetRoadProfile(traveledDistance).terrain
+		!= TerrainType::NarrowIcePath)
+	{
+		return;
+	}
+	// Leave a small warning margin near the rail instead of killing the player
+	// while the penguin still appears comfortably inside the bridge.
+	if (std::abs(player->GetHorizontalPosition()) > 0.98f)
+	{
+		fellFromNarrowIcePath = true;
+		state = State::Crashed;
 	}
 }
 
@@ -165,17 +236,36 @@ int PolarLevel::GetPlayerScreenY() const
 	return std::clamp(playerScreenY + offset, horizonY + 3, screenHeight - 2);
 }
 
+float PolarLevel::GetPlayerHorizontalMin() const
+{
+	const TerrainType terrain = GetRoadProfile(traveledDistance).terrain;
+	if (terrain == TerrainType::Coast)
+	{
+		return -0.62f;
+	}
+	return terrain == TerrainType::NarrowIcePath ? -1.15f : -1.0f;
+}
+
+float PolarLevel::GetPlayerHorizontalMax() const
+{
+	const TerrainType terrain = GetRoadProfile(traveledDistance).terrain;
+	return terrain == TerrainType::NarrowIcePath ? 1.15f : 1.0f;
+}
+
 const char* PolarLevel::GetObstacleName(ObstacleType type) const
 {
-	return type == ObstacleType::IceWall ? "ICE WALL" : "LOW SPIKE";
+	if (type == ObstacleType::IceWall) return "ICE WALL";
+	if (type == ObstacleType::BrokenBridge) return "BROKEN BRIDGE";
+	return "LOW SPIKE";
 }
 
 int PolarLevel::DistanceToScreenY(float distance) const
 {
 	const float normalized = std::clamp(1.0f - distance / viewDistance, 0.0f, 1.0f);
 	const float perspective = std::pow(normalized, 1.55f);
+	const int roadTopY = horizonY + 1;
 	const int roadBottomY = screenHeight - 1;
-	return horizonY + static_cast<int>(perspective * (roadBottomY - horizonY));
+	return roadTopY + static_cast<int>(perspective * (roadBottomY - roadTopY));
 }
 
 float PolarLevel::ScreenYToDistance(int screenY) const
@@ -188,8 +278,9 @@ float PolarLevel::ScreenYToDistance(int screenY) const
 float PolarLevel::ScreenYToRoadDepth(int screenY) const
 {
 	const int roadBottomY = screenHeight - 1;
-	return std::clamp(static_cast<float>(screenY - horizonY)
-		/ (roadBottomY - horizonY), 0.0f, 1.0f);
+	const int roadTopY = horizonY + 1;
+	return std::clamp(static_cast<float>(screenY - roadTopY)
+		/ (roadBottomY - roadTopY), 0.0f, 1.0f);
 }
 
 PolarLevel::RoadSlice PolarLevel::GetRoadProfile(float coursePosition) const
@@ -231,16 +322,26 @@ PolarLevel::RoadSlice PolarLevel::CalculateRoadSlice(float depth) const
 	slice.centerX = screenWidth / 2 + static_cast<int>(
 		slice.centerOffset * curvePerspective * maximumCurveOffset);
 
-	// A 30% half-width makes the normal road occupy about 60% of the screen.
-	const int nearHalfWidth = static_cast<int>(screenWidth * 0.30f);
+	// Keep the opening snowfield broad; narrow terrain still applies its own
+	// width scale below, so canyon and bridge sections remain distinct.
+	const int nearHalfWidth = static_cast<int>(screenWidth * 0.38f);
 	const int perspectiveHalfWidth = 2
 		+ static_cast<int>(depth * (nearHalfWidth - 2));
 	const int maximumVisibleHalfWidth = (std::max)(2,
 		(std::min)(slice.centerX - 1, screenWidth - slice.centerX - 2));
 	const float widthBlend = depth * depth * (3.0f - 2.0f * depth);
 	const float visibleWidth = 1.0f + (slice.width - 1.0f) * widthBlend;
+	float minimumWidthScale = 0.72f;
+	if (slice.terrain == TerrainType::Canyon)
+	{
+		minimumWidthScale = 0.45f;
+	}
+	else if (slice.terrain == TerrainType::NarrowIcePath)
+	{
+		minimumWidthScale = 0.28f;
+	}
 	const int minimumHalfWidth = 2 + static_cast<int>(depth
-		* (nearHalfWidth * 0.72f - 2.0f));
+		* (nearHalfWidth * minimumWidthScale - 2.0f));
 	slice.halfWidth = std::clamp((std::max)(minimumHalfWidth,
 		static_cast<int>(perspectiveHalfWidth * visibleWidth)),
 		2, maximumVisibleHalfWidth);
@@ -260,8 +361,8 @@ int PolarLevel::GetRoadHalfWidth(int screenY) const
 int PolarLevel::GetRoadScreenX(float horizontalPosition, int screenY) const
 {
 	const RoadSlice slice = CalculateRoadSlice(ScreenYToRoadDepth(screenY));
-	const int playerMargin = 6;
-	const int usableHalfWidth = (std::max)(0, slice.halfWidth - playerMargin);
+	const int usableHalfWidth = (std::max)(1,
+		static_cast<int>(slice.halfWidth * 0.72f));
 	return slice.centerX
 		+ static_cast<int>(horizontalPosition * usableHalfWidth);
 }
@@ -362,65 +463,182 @@ const char* PolarLevel::GetCurveDirection() const
 	return "STRAIGHT";
 }
 
-void PolarLevel::UpdateRunSpeed()
+void PolarLevel::UpdateRunSpeed(float deltaTime)
 {
-	runSpeed = std::abs(curveStrength) > 0.08f ? 14.0f : 16.0f;
+	const float baseSpeed = std::abs(curveStrength) > 0.08f ? 14.0f : 16.0f;
+	const float courseProgress = std::clamp(
+		traveledDistance / courseDistance, 0.0f, 1.0f);
+	const float distanceSpeedBonus = courseProgress * 8.0f;
+	const float forwardAmount = player ? std::clamp(
+		-static_cast<float>(player->GetLongitudinalScreenOffset()) / 8.0f,
+		0.0f, 1.0f) : 0.0f;
+	const float targetSpeed = baseSpeed + distanceSpeedBonus
+		+ forwardAmount * 3.0f;
+	const float speedBlend = (std::min)(deltaTime * 2.5f, 1.0f);
+	runSpeed += (targetSpeed - runSpeed) * speedBlend;
+}
+
+void PolarLevel::DrawSkyAndHorizon()
+{
+	// The sky and horizon stay screen-fixed; only the road projection curves.
+	Craft::Renderer::Get().Submit("*", Craft::Vector2(screenWidth / 5, 3),
+		Craft::Color::BrightWhite, 0);
+	Craft::Renderer::Get().Submit("*", Craft::Vector2(screenWidth * 3 / 4, 4),
+		Craft::Color::BrightWhite, 0);
+	Craft::Renderer::Get().Submit(".", Craft::Vector2(screenWidth / 2, 3),
+		Craft::Color::BrightWhite, 0);
+
+	const std::string mountains = "_/\\_      _/\\_        _/\\_";
+	Craft::Renderer::Get().Submit(mountains,
+		Craft::Vector2(screenWidth / 2 - static_cast<int>(mountains.size()) / 2,
+			horizonY - 2), Craft::Color::Cyan, 0);
+	Craft::Renderer::Get().Submit("/____\\____/____\\______/____\\",
+		Craft::Vector2(screenWidth / 2 - 15, horizonY - 1),
+		Craft::Color::BrightWhite, 0);
+	Craft::Renderer::Get().Submit(std::string(screenWidth, '_'),
+		Craft::Vector2(0, horizonY), Craft::Color::BrightWhite, 0);
 }
 
 void PolarLevel::DrawPerspectiveRoad()
 {
-	const int roadTopY = horizonY;
+	const int roadTopY = horizonY + 1;
 	const int roadBottomY = screenHeight - 1;
-	const RoadSlice topSlice = CalculateRoadSlice(0.0f);
-	DrawTerrainRow(roadTopY, topSlice);
-	Craft::Vector2 previousLeft(
-		topSlice.centerX - topSlice.halfWidth, roadTopY);
-	Craft::Vector2 previousRight(
-		topSlice.centerX + topSlice.halfWidth, roadTopY);
-	Craft::Renderer::Get().Submit("/", previousLeft, Craft::Color::Cyan, 0);
-	Craft::Renderer::Get().Submit("\\", previousRight, Craft::Color::Cyan, 0);
 
-	for (int y = roadTopY + 1; y <= roadBottomY; ++y)
+	for (int y = roadTopY; y <= roadBottomY; ++y)
 	{
-		const float depth = static_cast<float>(y - roadTopY)
-			/ (roadBottomY - roadTopY);
-		const RoadSlice currentSlice = CalculateRoadSlice(depth);
-		DrawTerrainRow(y, currentSlice);
-		const Craft::Vector2 currentLeft(
-			currentSlice.centerX - currentSlice.halfWidth, y);
-		const Craft::Vector2 currentRight(
-			currentSlice.centerX + currentSlice.halfWidth, y);
-		DrawRoadBoundary(previousLeft, currentLeft, true);
-		DrawRoadBoundary(previousRight, currentRight, false);
-		if ((y - roadTopY) % 3 == 0)
+		const float depth = ScreenYToRoadDepth(y);
+		const RoadSlice slice = CalculateRoadSlice(depth);
+
+		switch (slice.terrain)
 		{
-			Craft::Renderer::Get().Submit(".", Craft::Vector2(currentSlice.centerX, y),
-				Craft::Color::BrightWhite, 0);
+		case TerrainType::Snowfield:
+			DrawSnowfieldRow(y, depth, slice);
+			break;
+
+		case TerrainType::Coast:
+			DrawCoastRow(y, depth, slice);
+			break;
+
+		case TerrainType::Canyon:
+			DrawCanyonRow(y, depth, slice);
+			break;
+
+		case TerrainType::NarrowIcePath:
+			DrawNarrowIcePathRow(y, depth, slice);
+			break;
+
+		case TerrainType::BrokenIce:
+			DrawBrokenIceRow(y, depth, slice);
+			break;
+
+		case TerrainType::ResearchBase:
+			DrawResearchBaseRow(y, depth, slice);
+			break;
 		}
-		previousLeft = currentLeft;
-		previousRight = currentRight;
 	}
 }
 
-void PolarLevel::DrawTerrainRow(int y, const RoadSlice& slice)
+void PolarLevel::DrawSnowfieldRow(int y, float depth, const RoadSlice& slice)
 {
 	const int leftX = slice.centerX - slice.halfWidth;
 	const int rightX = slice.centerX + slice.halfWidth;
-	switch (slice.terrain)
+	DrawSnowSurface(y, 0, leftX - 1);
+	DrawSnowSurface(y, rightX + 1, screenWidth - 1);
+	Craft::Renderer::Get().Submit(depth > 0.55f ? "/" : "|",
+		Craft::Vector2(leftX, y), Craft::Color::BrightWhite, 0);
+	Craft::Renderer::Get().Submit(depth > 0.55f ? "\\" : "|",
+		Craft::Vector2(rightX, y), Craft::Color::BrightWhite, 0);
+}
+
+void PolarLevel::DrawCoastRow(int y, float depth, const RoadSlice& slice)
+{
+	const int leftX = slice.centerX - slice.halfWidth;
+	const int rightX = slice.centerX + slice.halfWidth;
+	DrawOcean(y, 0, leftX - 1);
+	DrawSnowSurface(y, rightX + 1, screenWidth - 1);
+	Craft::Renderer::Get().Submit(depth > 0.45f ? "~" : ":",
+		Craft::Vector2(leftX, y), Craft::Color::Blue, 0);
+	Craft::Renderer::Get().Submit("\\", Craft::Vector2(rightX, y),
+		Craft::Color::BrightWhite, 0);
+}
+
+void PolarLevel::DrawCanyonRow(int y, float depth, const RoadSlice& slice)
+{
+	const int leftX = slice.centerX - slice.halfWidth;
+	const int rightX = slice.centerX + slice.halfWidth;
+	DrawCanyonWall(y, 0, leftX - 1);
+	DrawCanyonWall(y, rightX + 1, screenWidth - 1);
+	const char* wallEdge = depth > 0.5f ? "#" : "|";
+	Craft::Renderer::Get().Submit(wallEdge, Craft::Vector2(leftX, y),
+		Craft::Color::Cyan, 0);
+	Craft::Renderer::Get().Submit(wallEdge, Craft::Vector2(rightX, y),
+		Craft::Color::Cyan, 0);
+}
+
+void PolarLevel::DrawNarrowIcePathRow(int y, float depth, const RoadSlice& slice)
+{
+	const int leftX = slice.centerX - slice.halfWidth;
+	const int rightX = slice.centerX + slice.halfWidth;
+	DrawOcean(y, 0, leftX - 1);
+	DrawOcean(y, rightX + 1, screenWidth - 1);
+
+	// Perspective rails make the strip read as a bridge rather than a tunnel.
+	Craft::Renderer::Get().Submit("/", Craft::Vector2(leftX, y),
+		Craft::Color::BrightWhite, 1);
+	Craft::Renderer::Get().Submit("\\", Craft::Vector2(rightX, y),
+		Craft::Color::BrightWhite, 1);
+
+	// Keep the intact ice quiet so the dense blue gap is immediately readable.
+	for (int x = leftX + 1; x < rightX; ++x)
 	{
-	case TerrainType::LeftCoast:
-		DrawOcean(y, 0, leftX - 1);
-		DrawSnowSurface(y, rightX + 1, screenWidth - 1);
-		break;
-	case TerrainType::RightCoast:
-		DrawSnowSurface(y, 0, leftX - 1);
-		DrawOcean(y, rightX + 1, screenWidth - 1);
-		break;
-	case TerrainType::Snowfield:
-	default:
-		DrawSnowSurface(y, 0, leftX - 1);
-		DrawSnowSurface(y, rightX + 1, screenWidth - 1);
-		break;
+		if ((x + y) % (depth > 0.55f ? 4 : 6) == 0)
+		{
+			const char* deckGlyph = (x + y) % 3 == 0 ? "/" : "_";
+			Craft::Renderer::Get().Submit(deckGlyph, Craft::Vector2(x, y),
+				Craft::Color::BrightWhite, 0);
+		}
+	}
+}
+
+void PolarLevel::DrawBrokenIceRow(int y, float depth, const RoadSlice& slice)
+{
+	const int leftX = slice.centerX - slice.halfWidth;
+	const int rightX = slice.centerX + slice.halfWidth;
+	DrawOcean(y, 0, leftX - 1);
+	DrawOcean(y, rightX + 1, screenWidth - 1);
+	DrawBrokenIce(y, leftX + 1, rightX - 1);
+	Craft::Renderer::Get().Submit(depth > 0.5f ? "/" : "|",
+		Craft::Vector2(leftX, y), Craft::Color::Cyan, 0);
+	Craft::Renderer::Get().Submit(depth > 0.5f ? "\\" : "|",
+		Craft::Vector2(rightX, y), Craft::Color::Cyan, 0);
+}
+
+void PolarLevel::DrawResearchBaseRow(int y, float depth, const RoadSlice& slice)
+{
+	const int leftX = slice.centerX - slice.halfWidth;
+	const int rightX = slice.centerX + slice.halfWidth;
+	DrawResearchBase(y, 0, leftX - 1);
+	DrawResearchBase(y, rightX + 1, screenWidth - 1);
+	const char* leftEdge = depth > 0.45f ? "[" : "|";
+	const char* rightEdge = depth > 0.45f ? "]" : "|";
+	Craft::Renderer::Get().Submit(leftEdge, Craft::Vector2(leftX, y),
+		Craft::Color::BrightWhite, 0);
+	Craft::Renderer::Get().Submit(rightEdge, Craft::Vector2(rightX, y),
+		Craft::Color::BrightWhite, 0);
+}
+
+void PolarLevel::DrawCanyonWall(int y, int startX, int endX)
+{
+	startX = std::clamp(startX, 0, screenWidth - 1);
+	endX = std::clamp(endX, 0, screenWidth - 1);
+	for (int x = startX; x <= endX; ++x)
+	{
+		if ((x + y) % 2 == 0)
+		{
+			const char* glyph = (x + y) % 6 == 0 ? "#" : ".";
+			Craft::Renderer::Get().Submit(glyph, Craft::Vector2(x, y),
+				Craft::Color::Cyan, 0);
+		}
 	}
 }
 
@@ -434,7 +652,7 @@ void PolarLevel::DrawSnowSurface(int y, int startX, int endX)
 		{
 			const char* glyph = (x + y) % 10 == 0 ? "*" : ".";
 			Craft::Renderer::Get().Submit(glyph, Craft::Vector2(x, y),
-				Craft::Color::BrightWhite, -10);
+				Craft::Color::BrightWhite, 0);
 		}
 	}
 }
@@ -449,19 +667,43 @@ void PolarLevel::DrawOcean(int y, int startX, int endX)
 		{
 			const char* glyph = (x + y) % 6 == 0 ? "~" : "-";
 			Craft::Renderer::Get().Submit(glyph, Craft::Vector2(x, y),
-				Craft::Color::Blue, -10);
+				Craft::Color::Blue, 0);
 		}
 	}
 }
 
-void PolarLevel::DrawRoadBoundary(const Craft::Vector2& previous,
-	const Craft::Vector2& current, bool leftBoundary)
+void PolarLevel::DrawBrokenIce(int y, int startX, int endX)
 {
-	const char* glyph = previous.x == current.x ? "|"
-		: ((current.x > previous.x) == leftBoundary ? "\\" : "/");
-	// One boundary cell per row prevents a multi-column delta from becoming
-	// a horizontal zipper. The previous point is used only to select the slope.
-	Craft::Renderer::Get().Submit(glyph, current, Craft::Color::Cyan, 0);
+	startX = std::clamp(startX, 0, screenWidth - 1);
+	endX = std::clamp(endX, 0, screenWidth - 1);
+	const float depth = ScreenYToRoadDepth(y);
+	const int spacing = 17 - static_cast<int>(depth * 9.0f);
+	for (int x = startX; x <= endX; ++x)
+	{
+		if ((x * 3 + y * 5) % spacing == 0)
+		{
+			const char* glyph = (x + y) % 2 == 0 ? "/" : "\\";
+			Craft::Renderer::Get().Submit(glyph, Craft::Vector2(x, y),
+				Craft::Color::Cyan, 0);
+		}
+	}
+}
+
+void PolarLevel::DrawResearchBase(int y, int startX, int endX)
+{
+	startX = std::clamp(startX, 0, screenWidth - 1);
+	endX = std::clamp(endX, 0, screenWidth - 1);
+	const float depth = ScreenYToRoadDepth(y);
+	const int spacing = 10 - static_cast<int>(depth * 5.0f);
+	for (int x = startX; x <= endX; ++x)
+	{
+		if ((x + y * 2) % spacing == 0)
+		{
+			const char* glyph = (y % 4 == 0) ? "#" : ((x % 5 == 0) ? "|" : "_");
+			Craft::Renderer::Get().Submit(glyph, Craft::Vector2(x, y),
+				Craft::Color::BrightWhite, 0);
+		}
+	}
 }
 
 void PolarLevel::DrawHud()
@@ -488,11 +730,17 @@ void PolarLevel::DrawHud()
 
 	if (state == State::Crashed)
 	{
-		const std::string message = std::string("CRASH: ")
-			+ GetObstacleName(crashedObstacleType) + "   R : Retry";
+		const std::string message = fellThroughBrokenBridge
+			? "CRASH: FELL THROUGH BROKEN BRIDGE   R : Retry"
+			: (fellFromNarrowIcePath
+				? "CRASH: FELL OFF NARROW ICE PATH   R : Retry"
+				: std::string("CRASH: ") + GetObstacleName(crashedObstacleType)
+					+ "   R : Retry");
+		const int messageY = fellThroughBrokenBridge
+			? horizonY + 2 : screenHeight / 2;
 		Craft::Renderer::Get().Submit(message,
 			Craft::Vector2(screenWidth / 2 - static_cast<int>(message.size()) / 2,
-				screenHeight / 2),
+				messageY),
 			Craft::Color::Red, 2000);
 	}
 	else if (state == State::Goal)
@@ -532,18 +780,31 @@ float PolarLevel::GetDisplayDistanceMeters() const
 void PolarLevel::DrawStartMenu()
 {
 	const std::string title = "POLAR RUNNER";
+	const std::string subtitle = "SOUTH POLE  ->  NORTH POLE";
 	const std::string start = "ENTER : START";
 	const std::string quit = "ESC : QUIT";
 	const int centerY = screenHeight / 2;
 	Craft::Renderer::Get().Submit(title,
 		Craft::Vector2(screenWidth / 2 - static_cast<int>(title.size()) / 2,
-			centerY - 2), Craft::Color::BrightWhite, 3000);
+			centerY - 6), Craft::Color::BrightWhite, 3000);
+	Craft::Renderer::Get().Submit(" _~_ ",
+		Craft::Vector2(screenWidth / 2 - 2, centerY - 4),
+		Craft::Color::Cyan, 3000);
+	Craft::Renderer::Get().Submit("(o o)",
+		Craft::Vector2(screenWidth / 2 - 2, centerY - 3),
+		Craft::Color::BrightWhite, 3000);
+	Craft::Renderer::Get().Submit("/ V \\",
+		Craft::Vector2(screenWidth / 2 - 2, centerY - 2),
+		Craft::Color::BrightWhite, 3000);
+	Craft::Renderer::Get().Submit(subtitle,
+		Craft::Vector2(screenWidth / 2 - static_cast<int>(subtitle.size()) / 2,
+			centerY), Craft::Color::Cyan, 3000);
 	Craft::Renderer::Get().Submit(start,
 		Craft::Vector2(screenWidth / 2 - static_cast<int>(start.size()) / 2,
-			centerY), Craft::Color::Cyan, 3000);
+			centerY + 2), Craft::Color::Yellow, 3000);
 	Craft::Renderer::Get().Submit(quit,
 		Craft::Vector2(screenWidth / 2 - static_cast<int>(quit.size()) / 2,
-			centerY + 2), Craft::Color::BrightWhite, 3000);
+			centerY + 4), Craft::Color::BrightWhite, 3000);
 }
 
 void PolarLevel::DrawPauseMenu()
@@ -571,14 +832,18 @@ void PolarLevel::DrawPauseMenu()
 
 void PolarLevel::Draw()
 {
+	if (state == State::StartMenu)
+	{
+		DrawSkyAndHorizon();
+		DrawStartMenu();
+		return;
+	}
+
+	DrawSkyAndHorizon();
 	DrawPerspectiveRoad();
 	Level::Draw();
 	DrawHud();
-	if (state == State::StartMenu)
-	{
-		DrawStartMenu();
-	}
-	else if (state == State::PauseMenu)
+	if (state == State::PauseMenu)
 	{
 		DrawPauseMenu();
 	}

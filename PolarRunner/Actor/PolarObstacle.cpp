@@ -2,6 +2,7 @@
 
 #include <Level/PolarLevel.h>
 #include <Render/Renderer.h>
+#include <algorithm>
 
 PolarObstacle::PolarObstacle(float horizontalPosition, float distance,
 	ObstacleType type, float horizontalHalfWidth)
@@ -38,6 +39,42 @@ void PolarObstacle::Draw()
 	const float closeness = 1.0f - distance / level->GetViewDistance();
 	std::string image;
 	Craft::Color obstacleColor = Craft::Color::Yellow;
+	if (obstacleType == ObstacleType::BrokenBridge)
+	{
+		const auto drawGapRow = [level, y](int rowY,
+			const std::string& pattern, Craft::Color color)
+		{
+			const int centerX = level->GetRoadCenterX(rowY);
+			const int halfWidth = level->GetRoadHalfWidth(rowY);
+			const int gapWidth = (std::max)(3, halfWidth * 2 - 1);
+			std::string row;
+			row.reserve(gapWidth);
+			for (int index = 0; index < gapWidth; ++index)
+			{
+				row += pattern[index % pattern.size()];
+			}
+			Craft::Renderer::Get().Submit(row,
+				Craft::Vector2(centerX - gapWidth / 2, rowY), color, y + 50);
+		};
+
+		if (closeness > 0.80f)
+		{
+			drawGapRow(y - 2, "/\\", Craft::Color::BrightWhite);
+			drawGapRow(y - 1, "~-", Craft::Color::Blue);
+			drawGapRow(y, "\\/", Craft::Color::BrightWhite);
+		}
+		else if (closeness > 0.55f)
+		{
+			drawGapRow(y - 1, "/\\", Craft::Color::BrightWhite);
+			drawGapRow(y, "~-", Craft::Color::Blue);
+			drawGapRow(y + 1, "\\/", Craft::Color::BrightWhite);
+		}
+		else
+		{
+			drawGapRow(y, "^", Craft::Color::BrightWhite);
+		}
+		return;
+	}
 	if (obstacleType == ObstacleType::LowSpike)
 	{
 		image = closeness > 0.80f ? "^^^^" : (closeness > 0.55f ? "^^" : "^");
@@ -60,13 +97,6 @@ void PolarObstacle::Draw()
 				drawCentered("|######|", -1);
 				image = "|######|";
 			}
-			else if (visualVariant == 1)
-			{
-				drawCentered("/##\\", -3);
-				drawCentered("|##|", -2);
-				drawCentered("|##|", -1);
-				image = "|##|";
-			}
 			else
 			{
 				drawCentered("/^^^^\\", -2);
@@ -76,17 +106,8 @@ void PolarObstacle::Draw()
 		}
 		else if (closeness > 0.55f)
 		{
-			if (visualVariant == 1)
-			{
-				drawCentered("/\\", -2);
-				drawCentered("||", -1);
-				image = "||";
-			}
-			else
-			{
-				drawCentered(visualVariant == 0 ? "/---\\" : "/^^\\", -1);
-				image = visualVariant == 0 ? "|###|" : "\\__/";
-			}
+			drawCentered(visualVariant == 0 ? "/---\\" : "/^^\\", -1);
+			image = visualVariant == 0 ? "|###|" : "\\__/";
 		}
 		else
 		{

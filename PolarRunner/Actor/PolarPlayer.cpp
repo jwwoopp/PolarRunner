@@ -24,6 +24,7 @@ void PolarPlayer::Tick(float deltaTime)
 	}
 
 	const Craft::Input& input = Craft::Input::Get();
+	const bool jumpPressed = input.GetKeyDown(VK_SPACE);
 	const float horizontalInput =
 		(input.GetKey(VK_RIGHT) ? 1.0f : 0.0f)
 		- (input.GetKey(VK_LEFT) ? 1.0f : 0.0f);
@@ -33,9 +34,12 @@ void PolarPlayer::Tick(float deltaTime)
 	horizontalVelocity += (horizontalInput * horizontalSpeed - horizontalVelocity)
 		* horizontalBlend;
 
+	const float horizontalMin = level->GetPlayerHorizontalMin();
+	const float horizontalMax = level->GetPlayerHorizontalMax();
 	horizontalPosition = std::clamp(
-		horizontalPosition + horizontalVelocity * deltaTime, -1.0f, 1.0f);
-	if (horizontalPosition == -1.0f || horizontalPosition == 1.0f)
+		horizontalPosition + horizontalVelocity * deltaTime,
+		horizontalMin, horizontalMax);
+	if (horizontalPosition == horizontalMin || horizontalPosition == horizontalMax)
 	{
 		horizontalVelocity = 0.0f;
 	}
@@ -43,14 +47,19 @@ void PolarPlayer::Tick(float deltaTime)
 	const float longitudinalInput =
 		(input.GetKey(VK_DOWN) ? 1.0f : 0.0f)
 		- (input.GetKey(VK_UP) ? 1.0f : 0.0f);
-	longitudinalScreenOffset = std::clamp(
-		longitudinalScreenOffset
-			+ longitudinalInput * longitudinalSpeed * deltaTime,
-		-8.0f, 4.0f);
+	// Lock forward/back movement while airborne. Moving the collision row during
+	// a jump let UP + SPACE extend bridge clearance without extending jump time.
+	if (!isJumping && !jumpPressed)
+	{
+		longitudinalScreenOffset = std::clamp(
+			longitudinalScreenOffset
+				+ longitudinalInput * longitudinalSpeed * deltaTime,
+			-8.0f, 4.0f);
+	}
 
 	jumpInputBufferRemaining
 		= (std::max)(0.0f, jumpInputBufferRemaining - deltaTime);
-	if (Craft::Input::Get().GetKeyDown(VK_SPACE))
+	if (jumpPressed)
 	{
 		if (!isJumping)
 		{
@@ -119,7 +128,7 @@ void PolarPlayer::Draw()
 	}
 	else
 	{
-		Craft::Renderer::Get().Submit(" (o)___", Craft::Vector2(x - 3, y - 1), Craft::Color::Cyan, 100);
+		Craft::Renderer::Get().Submit(" (o)___", Craft::Vector2(x - 3, y - 1), Craft::Color::BrightWhite, 100);
 		Craft::Renderer::Get().Submit("____<(_____)", Craft::Vector2(x - 6, y), Craft::Color::BrightWhite, 100);
 	}
 }

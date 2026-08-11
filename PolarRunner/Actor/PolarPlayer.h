@@ -23,7 +23,7 @@ public:
 
 private:
 	float horizontalPosition = 0.0f;
-	float horizontalHalfWidth = 0.14f;
+	float horizontalHalfWidth = 0.10f;
 	float horizontalVelocity = 0.0f;
 	float horizontalSpeed = 1.8f;
 	float longitudinalScreenOffset = 0.0f;

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup><Filter Include="Source Files"><UniqueIdentifier>{a3c9c94b-966f-44a1-a58d-204783fcfa7c}</UniqueIdentifier><Extensions>cpp;c;cc;cxx</Extensions></Filter><Filter Include="Header Files"><UniqueIdentifier>{539333c8-5f39-4f30-bcb1-c41a1d2524a3}</UniqueIdentifier><Extensions>h;hpp</Extensions></Filter></ItemGroup>
+  <ItemGroup><ClCompile Include="Actor\PolarObstacle.cpp"><Filter>Source Files</Filter></ClCompile><ClCompile Include="Actor\PolarPlayer.cpp"><Filter>Source Files</Filter></ClCompile><ClCompile Include="Level\PolarLevel.cpp"><Filter>Source Files</Filter></ClCompile><ClCompile Include="Main.cpp"><Filter>Source Files</Filter></ClCompile></ItemGroup>
+  <ItemGroup><ClInclude Include="Actor\PolarObstacle.h"><Filter>Header Files</Filter></ClInclude><ClInclude Include="Actor\PolarPlayer.h"><Filter>Header Files</Filter></ClInclude><ClInclude Include="Game\Lane.h"><Filter>Header Files</Filter></ClInclude><ClInclude Include="Game\ObstacleType.h"><Filter>Header Files</Filter></ClInclude><ClInclude Include="Level\PolarLevel.h"><Filter>Header Files</Filter></ClInclude></ItemGroup>
+</Project>

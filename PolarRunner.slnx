@@ -1,0 +1,12 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="CraftEngine/CraftEngine.vcxproj" Id="4d187b95-b8b2-44f2-9788-d49b1752ec3a">
+    <BuildType Project="Debug" />
+  </Project>
+  <Project Path="PolarRunner/PolarRunner.vcxproj" Id="a7a91a38-3d71-4a4b-bdb8-12e17ad62d9b">
+    <BuildDependency Project="CraftEngine/CraftEngine.vcxproj" />
+    <BuildType Project="Debug" />
+  </Project>
+</Solution>

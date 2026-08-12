@@ -56,7 +56,4 @@ void TitleLevel::Draw()
 	drawCenter("ENTER : START", 2, Craft::Color::Yellow);
 	drawCenter("T : SHOOT TEST", 3, Craft::Color::Cyan);
 	drawCenter("ESC : QUIT", 4, Craft::Color::BrightWhite);
-
-
 }
-

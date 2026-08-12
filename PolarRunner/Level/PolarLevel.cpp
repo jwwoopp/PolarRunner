@@ -350,7 +350,7 @@ void PolarLevel::HandlePlayerFire()
 	const int direction = player->IsFacingRight() ? 1 : -1;
 	const int bulletStartX = playerX + direction * 5;
 	SpawnActor<PlayerBullet>(Craft::Vector2(bulletStartX, playerY - 1), direction);
-	
+
 	--nonShotCount;
 
 }

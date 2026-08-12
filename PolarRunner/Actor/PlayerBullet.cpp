@@ -1,5 +1,5 @@
 #include <Engine/Engine.h>
-#include <Actor/TestTarget.h>
+#include <Actor/Enemy.h>
 #include "PlayerBullet.h"
 
 using namespace Craft;
@@ -13,7 +13,7 @@ PlayerBullet::PlayerBullet(const Craft::Vector2& position, int direction)
 
 void PlayerBullet::OnCollision(const std::shared_ptr<Craft::Actor>& other)
 {
-	if (std::dynamic_pointer_cast<TestTarget>(other))
+	if (std::dynamic_pointer_cast<Enemy>(other))
 	{
 		other->Destroy();
 		Destroy();

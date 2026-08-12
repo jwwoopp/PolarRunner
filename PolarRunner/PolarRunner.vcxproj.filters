@@ -38,8 +38,8 @@
     <ClCompile Include="Level\TestLevel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Actor\TestTarget.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="Actor\Enemy.cpp">
+	  <Filter>Actor</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -67,8 +67,8 @@
     <ClInclude Include="Level\TestLevel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Actor\TestTarget.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="Actor\Enemy.h">
+	  <Filter>Actor</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

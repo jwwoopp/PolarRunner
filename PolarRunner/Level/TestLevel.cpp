@@ -1,7 +1,7 @@
 ﻿#include "TestLevel.h"
 
 #include <Actor/PlayerBullet.h>
-#include <Actor/TestTarget.h>
+#include <Actor/Enemy.h>
 #include <Engine/Engine.h>
 #include <Input/Input.h>
 #include <Math/Color.h>
@@ -41,13 +41,13 @@ void TestLevel::Draw()
 		1000);
 }
 
-void TestLevel::OnInitialized() 
+void TestLevel::OnInitialized()
 {
 	super::OnInitialized();
 
 	const int screenWidth = Craft::Engine::Get().GetWidth();
 	const int screenHeight = Craft::Engine::Get().GetHeight();
 
-	SpawnActor<TestTarget>(
+	SpawnActor<Enemy>(
 		Craft::Vector2(screenWidth - 15, screenHeight / 2));
 }

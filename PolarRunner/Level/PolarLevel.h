@@ -2,6 +2,7 @@
 
 #include <Game/ObstacleType.h>
 #include <Level/Level.h>
+#include <Actor/EnemyBullet.h>
 #include <string>
 #include <vector>
 
@@ -58,6 +59,7 @@ private:
 	void BuildRoadCourse();
 	void BuildTestCourse();
 	void CheckObstacleCollisions();
+	void CheckEnemyBulletCollisions();
 	void CheckStarCollections();
 	void HandlePlayerFire();
 	void UpdateCoastEnemy(float deltaTime);
@@ -128,10 +130,12 @@ private:
 	ObstacleType crashedObstacleType = ObstacleType::LowSpike;
 	bool fellFromNarrowIcePath = false;
 	bool fellThroughBrokenBridge = false;
+	bool hitByEnemyBullet = false;
 	std::shared_ptr<Player> player;
 	std::vector<RoadSlice> roadSlices;
 	std::vector<std::shared_ptr<PolarObstacle>> obstacles;
 	std::vector<std::shared_ptr<PolarStar>> stars;
+	std::vector<std::shared_ptr<EnemyBullet>> enemyBullets;
 	std::shared_ptr<Enemy> coastEnemy;
 	bool hasSpawnedCoastEnemy = false;
 	float coastEnemyWarningTimer = 0.0f;

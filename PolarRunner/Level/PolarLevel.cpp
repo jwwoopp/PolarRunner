@@ -328,6 +328,7 @@ void PolarLevel::Tick(float deltaTime)
 	CheckTerrainHazards();
 	CheckObstacleCollisions();
 	CheckStarCollections();
+	CheckEnemyBulletCollisions();
 	if (traveledDistance >= courseDistance && IsPlaying())
 	{
 		state = State::Goal;
@@ -405,12 +406,8 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 	coastEnemy->SetPosition(Craft::Vector2(screenX, screenY));
 
 	// Enemy가 접근을 마치고 펭귄이 달리는 지면 근처까지 내려온 뒤 사격합니다.
-	const int enemyMuzzleX = screenX + coastEnemy->GetWidth();
-	const int horizontalDistance = std::abs(playerScreenX - enemyMuzzleX);
-	const int fireRange = std::clamp(screenWidth / 4, 20, 50);
-	const bool isPlayerInFireRange = horizontalDistance <= fireRange;
-	if (coastEnemy->GetState() == EnemyState::Chasing
-		&& isPlayerInFireRange)
+	// Chasing은 X축 접근이 끝나 사격 위치에 도달했다는 뜻입니다.
+	if (coastEnemy->GetState() == EnemyState::Chasing)
 	{
 		enemyFireTimer += deltaTime;
 		constexpr float fireInterval = 2.0f;
@@ -419,8 +416,9 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 			const Craft::Vector2 enemyPosition = coastEnemy->GetPosition();
 			const Craft::Vector2 bulletPosition(
 				enemyPosition.x + coastEnemy->GetWidth(),
-				enemyPosition.y);
-			SpawnActor<EnemyBullet>(bulletPosition);
+				GetPlayerScreenY());
+			enemyBullets.emplace_back(
+				SpawnActor<EnemyBullet>(bulletPosition));
 			enemyFireTimer = 0.0f;
 		}
 	}
@@ -593,6 +591,63 @@ void PolarLevel::CheckObstacleCollisions()
 		{
 			obstacle->MarkChecked();
 		}
+	}
+}
+
+void PolarLevel::CheckEnemyBulletCollisions()
+{
+	if (!player)
+	{
+		return;
+	}
+
+	const int playerGroundY = GetPlayerScreenY();
+
+	const int playerY =
+		playerGroundY - player->GetJumpScreenOffset();
+
+	const int playerX = GetRoadScreenX(
+		player->GetHorizontalPosition(),
+		playerGroundY);
+
+	const int playerLeft =
+		playerX - (player->IsJumping() ? 3 : 5);
+
+	const int playerRight =
+		playerX + (player->IsJumping() ? 3 : 5);
+
+	const int playerTop =
+		playerY - (player->IsJumping() ? 4 : 1);
+
+	const int playerBottom = playerY;
+
+	for (const std::shared_ptr<EnemyBullet>& bullet : enemyBullets)
+	{
+		if (bullet && !bullet->HasExpired())
+		{
+			const Craft::Vector2 current = bullet->GetPosition();
+			const Craft::Vector2 previous = bullet->GetPreviousPosition();
+			const int bulletLeft = (std::min)(current.x, previous.x);
+			const int bulletRight = (std::max)(current.x, previous.x);
+			const bool overlapsX = bulletRight >= playerLeft
+				&& bulletLeft <= playerRight;
+			const bool overlapsY = current.y >= playerTop
+				&& current.y <= playerBottom;
+
+			if (overlapsX && overlapsY)
+			{
+				bullet->Destroy();
+				hitByEnemyBullet = true;
+				state = State::Crashed;
+				return;
+			}
+		}
+		if (!bullet || bullet->HasExpired())
+		{
+			continue;
+		}
+
+		// 다음 단계에서 탄환 위치와 비교합니다.
 	}
 }
 
@@ -1196,12 +1251,14 @@ void PolarLevel::DrawHud()
 
 	if (state == State::Crashed)
 	{
-		const std::string message = fellThroughBrokenBridge
+		const std::string message = hitByEnemyBullet
+			? "CRASH: HIT BY ENEMY BULLET   R : Retry"
+			: (fellThroughBrokenBridge
 			? "CRASH: FELL THROUGH BROKEN BRIDGE   R : Retry"
 			: (fellFromNarrowIcePath
 				? "CRASH: FELL OFF NARROW ICE PATH   R : Retry"
 				: std::string("CRASH: ") + GetObstacleName(crashedObstacleType)
-					+ "   R : Retry");
+					+ "   R : Retry"));
 		const int messageY = fellThroughBrokenBridge
 			? horizonY + 2 : screenHeight / 2;
 		Craft::Renderer::Get().Submit(message,

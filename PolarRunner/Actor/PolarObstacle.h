@@ -15,6 +15,7 @@ public:
 
 	inline float GetHorizontalPosition() const { return horizontalPosition; }
 	inline float GetDistance() const { return distance; }
+	inline float GetPreviousDistance() const { return previousDistance; }
 	inline ObstacleType GetObstacleType() const { return obstacleType; }
 	inline float GetHorizontalHalfWidth() const { return horizontalHalfWidth; }
 	inline bool HasBeenChecked() const { return hasBeenChecked; }
@@ -23,6 +24,7 @@ public:
 private:
 	float horizontalPosition = 0.0f;
 	float distance = 0.0f;
+	float previousDistance = 0.0f;
 	ObstacleType obstacleType = ObstacleType::LowSpike;
 	float horizontalHalfWidth = 0.0f;
 	int visualVariant = 0;

@@ -19,6 +19,7 @@ public:
 	}
 	inline bool IsJumping() const { return isJumping; }
 	bool IsAboveObstacle() const;
+	float GetJumpHeight() const;
 	int GetJumpScreenOffset() const;
 
 private:

@@ -166,16 +166,15 @@ void PolarLevel::CheckObstacleCollisions()
 		}
 
 		const int obstacleScreenY = DistanceToScreenY(obstacle->GetDistance());
+		const int previousObstacleScreenY =
+			DistanceToScreenY(obstacle->GetPreviousDistance());
 		const int currentPlayerScreenY = GetPlayerScreenY();
 		const bool isBrokenBridge =
 			obstacle->GetObstacleType() == ObstacleType::BrokenBridge;
 		const int contactScreenY = isBrokenBridge
 			? obstacleScreenY - 1
 			: obstacleScreenY;
-		// Once an obstacle has visibly passed the player's current row it must
-		// not become dangerous again if the player moves backward.
-		if (contactScreenY > currentPlayerScreenY + 1
-			|| obstacle->GetDistance() < -2.0f)
+		if (obstacle->GetDistance() < -2.0f)
 		{
 			obstacle->MarkChecked();
 			continue;
@@ -188,21 +187,21 @@ void PolarLevel::CheckObstacleCollisions()
 		const bool horizontalOverlap =
 			std::abs(player->GetHorizontalPosition()
 				- obstacle->GetHorizontalPosition()) < combinedHalfWidth;
-		// Collision follows the player's movable screen row. A one-row window
-		// prevents a fast obstacle from slipping through between rendered rows.
+		// Collision occurs only when the projected obstacle crosses the penguin's
+		// foot row from above. The swept row test also works at high run speeds.
+		const bool crossedPlayerRow =
+			previousObstacleScreenY <= currentPlayerScreenY
+			&& obstacleScreenY >= currentPlayerScreenY;
 		const bool reachesPlayer = isBrokenBridge
 			? contactScreenY >= currentPlayerScreenY
 				&& contactScreenY <= currentPlayerScreenY + 1
-			: std::abs(contactScreenY - currentPlayerScreenY) <= 1;
+			: crossedPlayerRow;
 		const bool clearedLowSpike =
 			obstacle->GetObstacleType() == ObstacleType::LowSpike
 			&& player->IsAboveObstacle();
-		// The upright airborne pose must agree with the gameplay result. Bridge
-		// gaps require a jump state, while low spikes still require real height.
-		const bool jumpIntent = player->IsJumping()
-			|| Craft::Input::Get().GetKey(VK_SPACE)
-			|| Craft::Input::Get().GetKeyDown(VK_SPACE);
-		const bool clearedBrokenBridge = isBrokenBridge && jumpIntent;
+		// 다리는 오직 펭귄이 충분히 뛰었을 때만 건너는 것이 가능(점프 높이 3 이상).
+		const bool clearedBrokenBridge = isBrokenBridge
+			&& player->GetJumpHeight() >= 0.6f;
 		if ((isBrokenBridge || horizontalOverlap) && reachesPlayer
 			&& !clearedLowSpike && !clearedBrokenBridge)
 		{
@@ -210,6 +209,11 @@ void PolarLevel::CheckObstacleCollisions()
 			fellThroughBrokenBridge = isBrokenBridge;
 			state = State::Crashed;
 			return;
+		}
+		if ((!isBrokenBridge && obstacleScreenY > currentPlayerScreenY)
+			|| (isBrokenBridge && contactScreenY > currentPlayerScreenY + 1))
+		{
+			obstacle->MarkChecked();
 		}
 	}
 }

@@ -93,17 +93,22 @@ void PolarPlayer::Tick(float deltaTime)
 
 bool PolarPlayer::IsAboveObstacle() const
 {
-	return GetJumpScreenOffset() >= 2;
+	return GetJumpHeight() >= 0.4f;
+}
+
+float PolarPlayer::GetJumpHeight() const
+{
+	if (!isJumping)
+	{
+		return 0.0f;
+	}
+	const float progress = jumpTimer / jumpDuration;
+	return std::sin(progress * 3.14159265f);
 }
 
 int PolarPlayer::GetJumpScreenOffset() const
 {
-	if (!isJumping)
-	{
-		return 0;
-	}
-	const float progress = jumpTimer / jumpDuration;
-	return static_cast<int>(std::sin(progress * 3.14159265f) * 5.0f);
+	return static_cast<int>(GetJumpHeight() * 5.0f);
 }
 
 void PolarPlayer::Draw()

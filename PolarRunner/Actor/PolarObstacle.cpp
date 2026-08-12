@@ -7,7 +7,8 @@
 PolarObstacle::PolarObstacle(float horizontalPosition, float distance,
 	ObstacleType type, float horizontalHalfWidth)
 	: Actor("", Craft::Vector2::Zero, Craft::Color::Yellow),
-	  horizontalPosition(horizontalPosition), distance(distance), obstacleType(type),
+	  horizontalPosition(horizontalPosition), distance(distance),
+	  previousDistance(distance), obstacleType(type),
 	  horizontalHalfWidth(horizontalHalfWidth),
 	  visualVariant(static_cast<int>(distance / 10.0f
 		  + (horizontalPosition + 1.0f) * 7.0f) % 3)
@@ -21,6 +22,7 @@ void PolarObstacle::Tick(float deltaTime)
 		= std::dynamic_pointer_cast<PolarLevel>(GetOwner());
 	if (level && level->IsPlaying())
 	{
+		previousDistance = distance;
 		distance -= level->GetRunSpeed() * deltaTime;
 	}
 }

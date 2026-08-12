@@ -2,6 +2,7 @@
 
 #include <Actor/PolarObstacle.h>
 #include <Actor/Player.h>
+#include <Actor/PlayerBullet.h>
 #include <Actor/PolarStar.h>
 #include <Engine/Engine.h>
 #include <Input/Input.h>
@@ -317,6 +318,7 @@ void PolarLevel::Tick(float deltaTime)
 	UpdateCurve(deltaTime);
 	UpdateRunSpeed(deltaTime);
 	Level::Tick(deltaTime);
+	HandlePlayerFire();
 	traveledDistance += runSpeed * deltaTime;
 	UpdateSpeedNotification(deltaTime);
 	CheckTerrainHazards();
@@ -326,6 +328,31 @@ void PolarLevel::Tick(float deltaTime)
 	{
 		state = State::Goal;
 	}
+}
+
+void PolarLevel::HandlePlayerFire()
+{
+	if (!player || nonShotCount <= 0 || player->IsJumping())
+	{
+		return;
+	}
+
+	if (!Craft::Input::Get().GetKeyDown('F'))
+	{
+		return;
+	}
+
+	const int playerY = GetPlayerScreenY();
+	const int playerX = GetRoadScreenX(
+		player->GetHorizontalPosition(), playerY);
+
+
+	const int direction = player->IsFacingRight() ? 1 : -1;
+	const int bulletStartX = playerX + direction * 5;
+	SpawnActor<PlayerBullet>(Craft::Vector2(bulletStartX, playerY - 1), direction);
+	
+	--nonShotCount;
+
 }
 
 void PolarLevel::CheckStarCollections()
@@ -361,7 +388,7 @@ void PolarLevel::CheckStarCollections()
 			if (collectedStarCount >= RequiredStarCount)
 			{
 				collectedStarCount -= RequiredStarCount;
-				++nonLethalShotCount;
+				++nonShotCount;
 			}
 		}
 	}
@@ -1014,7 +1041,7 @@ void PolarLevel::DrawHud()
 		<< "  SPEED: " << runSpeed
 		<< "  ROAD: " << GetCurveDirection()
 		<< "  STAR: " << collectedStarCount << " / " << RequiredStarCount
-		<< "  SHOT: " << nonLethalShotCount;
+		<< "  SHOT: " << nonShotCount;
 	Craft::Renderer::Get().Submit(hud.str(), Craft::Vector2(1, 0),
 		Craft::Color::BrightWhite, 1000);
 	Craft::Renderer::Get().Submit("ARROWS: Glide / Forward / Back   SPACE: Jump   ESC: Menu",
@@ -1028,7 +1055,7 @@ void PolarLevel::DrawHud()
 				? Craft::Color::Yellow : Craft::Color::Cyan,
 			1600);
 	}
-	if (nonLethalShotCount > 0)
+	if (nonShotCount > 0)
 	{
 		const std::string ready = "SHOT READY!";
 		Craft::Renderer::Get().Submit(ready,

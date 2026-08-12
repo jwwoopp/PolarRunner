@@ -96,6 +96,7 @@
     <ClCompile Include="Actor\PolarObstacle.cpp" />
     <ClCompile Include="Actor\Player.cpp" />
     <ClCompile Include="Actor\PolarStar.cpp" />
+    <ClCompile Include="Actor\TestTarget.cpp" />
     <ClCompile Include="Level\PolarLevel.cpp" />
     <ClCompile Include="Level\TestLevel.cpp" />
     <ClCompile Include="Level\TitleLevel.cpp" />
@@ -106,6 +107,7 @@
     <ClInclude Include="Actor\PolarObstacle.h" />
     <ClInclude Include="Actor\Player.h" />
     <ClInclude Include="Actor\PolarStar.h" />
+    <ClInclude Include="Actor\TestTarget.h" />
     <ClInclude Include="Game\ObstacleType.h" />
     <ClInclude Include="Level\PolarLevel.h" />
     <ClInclude Include="Level\TestLevel.h" />

@@ -58,6 +58,7 @@ private:
 	void BuildTestCourse();
 	void CheckObstacleCollisions();
 	void CheckStarCollections();
+	void HandlePlayerFire();
 	void CheckTerrainHazards();
 	void DrawSkyAndHorizon();
 	void DrawPerspectiveRoad();
@@ -116,7 +117,7 @@ private:
 	float speedNotificationTimer = 0.0f;
 	int speedNotificationStage = 0;
 	int collectedStarCount = 0;
-	int nonLethalShotCount = 0;
+	int nonShotCount = 0;
 	static constexpr int RequiredStarCount = 5;
 	std::string speedNotification;
 	State state = State::Playing;

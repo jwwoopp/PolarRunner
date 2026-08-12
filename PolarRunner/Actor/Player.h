@@ -18,6 +18,7 @@ public:
 		return static_cast<int>(longitudinalScreenOffset);
 	}
 	inline bool IsJumping() const { return isJumping; }
+	inline bool IsFacingRight() const { return isFacingRight; }
 	bool IsAboveObstacle() const;
 	float GetJumpHeight() const;
 	int GetJumpScreenOffset() const;

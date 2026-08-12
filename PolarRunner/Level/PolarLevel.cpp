@@ -325,7 +325,7 @@ void PolarLevel::Tick(float deltaTime)
 	traveledDistance += runSpeed * deltaTime;
 	UpdateCoastEnemy(deltaTime);
 	UpdateSpeedNotification(deltaTime);
-	CheckTerrainHazards();
+	CheckTerrainHazards(deltaTime);
 	CheckObstacleCollisions();
 	CheckStarCollections();
 	CheckEnemyBulletCollisions();
@@ -410,7 +410,10 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 	if (coastEnemy->GetState() == EnemyState::Chasing)
 	{
 		enemyFireTimer += deltaTime;
-		constexpr float fireInterval = 2.0f;
+		// 느린 예고탄, 한 번의 빠른 후속탄, 긴 휴식이 반복됩니다.
+		constexpr float fireIntervals[] = { 2.5f, 1.4f, 3.0f };
+		constexpr int firePatternCount = 3;
+		const float fireInterval = fireIntervals[enemyFirePatternIndex];
 		if (enemyFireTimer >= fireInterval)
 		{
 			const Craft::Vector2 enemyPosition = coastEnemy->GetPosition();
@@ -419,6 +422,8 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 				GetPlayerScreenY());
 			enemyBullets.emplace_back(
 				SpawnActor<EnemyBullet>(bulletPosition));
+			enemyFirePatternIndex =
+				(enemyFirePatternIndex + 1) % firePatternCount;
 			enemyFireTimer = 0.0f;
 		}
 	}
@@ -657,18 +662,28 @@ bool PolarLevel::IsOnNarrowIcePath() const
 		== TerrainType::NarrowIcePath;
 }
 
-void PolarLevel::CheckTerrainHazards()
+void PolarLevel::CheckTerrainHazards(float deltaTime)
 {
 	if (!player || !IsOnNarrowIcePath())
 	{
+		narrowPathFallTimer = 0.0f;
 		return;
 	}
 
 	constexpr float fallBoundary = 1.25f;
+	constexpr float fallGraceTime = 0.4f;
 	if (std::abs(player->GetHorizontalPosition()) > fallBoundary)
 	{
-		fellFromNarrowIcePath = true;
-		state = State::Crashed;
+		narrowPathFallTimer += deltaTime;
+		if (narrowPathFallTimer >= fallGraceTime)
+		{
+			fellFromNarrowIcePath = true;
+			state = State::Crashed;
+		}
+	}
+	else
+	{
+		narrowPathFallTimer = 0.0f;
 	}
 }
 

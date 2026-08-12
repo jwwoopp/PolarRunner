@@ -63,7 +63,7 @@ private:
 	void CheckStarCollections();
 	void HandlePlayerFire();
 	void UpdateCoastEnemy(float deltaTime);
-	void CheckTerrainHazards();
+	void CheckTerrainHazards(float deltaTime);
 	void DrawSkyAndHorizon();
 	void DrawPerspectiveRoad();
 	void DrawNarrowPathWarningSign();
@@ -131,6 +131,7 @@ private:
 	bool fellFromNarrowIcePath = false;
 	bool fellThroughBrokenBridge = false;
 	bool hitByEnemyBullet = false;
+	float narrowPathFallTimer = 0.0f;
 	std::shared_ptr<Player> player;
 	std::vector<RoadSlice> roadSlices;
 	std::vector<std::shared_ptr<PolarObstacle>> obstacles;
@@ -141,4 +142,5 @@ private:
 	float coastEnemyWarningTimer = 0.0f;
 	float enemyFireTimer = 0.0f;
 	float coastEnemyScreenX = 0.0f;
+	int enemyFirePatternIndex = 0;
 };

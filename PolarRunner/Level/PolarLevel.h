@@ -110,6 +110,7 @@ private:
 	float traveledDistance = 0.0f;
 	float curveStrength = 0.0f;
 	State state = State::StartMenu;
+	State stateBeforePause = State::Playing;
 	MenuItem selectedMenuItem = MenuItem::Resume;
 	ObstacleType crashedObstacleType = ObstacleType::LowSpike;
 	bool fellFromNarrowIcePath = false;

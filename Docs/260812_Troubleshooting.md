@@ -109,3 +109,136 @@ GetJumpHeight() — 게임 판정용 높이(0.0~1.0)
 - 충돌 판정을 ASCII 문자의 개별 위치에 직접 연결하지 않는다.
 - 게임 규칙은 논리 좌표로 계산하고, 렌더링 단계에서만 화면 좌표로 변환한다.
 - 장애물마다 요구 높이를 다르게 두면 같은 점프 동작으로도 난이도 차이를 만들 수 있다.
+
+---
+
+## LowSpike 충돌 시점 개선
+
+### 문제 현상
+
+- 가시가 펭귄에게 닿기 전에 `CRASH: LOW SPIKE`가 표시됐다.
+- 기존 판정을 수정한 뒤에는 반대로 가시가 펭귄을 그대로 통과하는 문제가 발생했다.
+
+### 최초 원인
+
+기존 코드는 장애물과 플레이어의 화면 Y 좌표 차이가 1 이하이면 충돌한 것으로 판단했다.
+
+```cpp
+const bool reachesPlayer =
+    std::abs(contactScreenY - currentPlayerScreenY) <= 1;
+```
+
+고속 이동 중 충돌을 놓치지 않으려는 여유 범위였지만, 가시가 아직 플레이어보다 한 줄 앞에 있을 때도 충돌하여 조기 판정처럼 보였다.
+
+### 실패한 접근
+
+플레이어 화면 행을 거리로 역변환하고 장애물의 이전 거리와 현재 거리 사이에 포함되는지 검사했다.
+
+```cpp
+const float playerCollisionDistance =
+    ScreenYToDistance(currentPlayerScreenY);
+
+const bool crossedPlayerDistance =
+    obstacle->GetPreviousDistance() >= playerCollisionDistance
+    && obstacle->GetDistance() <= playerCollisionDistance;
+```
+
+그러나 현재 게임은 원근 투영 과정에서 화면 Y 좌표가 정수로 변환된다. 역변환한 거리와 실제로 그려지는 행의 경계가 정확히 일치하지 않아 충돌 시점을 놓치는 경우가 생겼다.
+
+### 최종 해결
+
+장애물의 이전 프레임 화면 행과 현재 프레임 화면 행을 모두 계산하여, 그 사이에 펭귄의 발 행이 포함되는지 검사했다.
+
+```cpp
+const int previousObstacleScreenY =
+    DistanceToScreenY(obstacle->GetPreviousDistance());
+
+const bool crossedPlayerRow =
+    previousObstacleScreenY <= currentPlayerScreenY
+    && obstacleScreenY >= currentPlayerScreenY;
+```
+
+이 방식은 장애물이 발 행에 도착하기 전에는 충돌하지 않으며, 속도가 빨라 한 프레임에 여러 행을 이동해도 발 행을 통과했는지 확인할 수 있다.
+
+### 충돌 범위 해석
+
+- 펭귄 ASCII 전체를 문자 단위로 충돌 처리하지 않는다.
+- 장애물과 펭귄의 논리적인 가로 범위가 겹칠 때만 충돌한다.
+- 날개나 ASCII 여백만 스친 경우에는 통과할 수 있다.
+- 몸 중앙이나 발을 관통해도 통과한다면 가로 충돌 폭을 다시 조정해야 한다.
+
+---
+
+## BrokenBridge 시각적 위치와 판정 위치 동기화
+
+### 문제 현상
+
+- 화면에서는 다리의 앞쪽 균열선이 이미 펭귄 아래로 지나갔는데 뒤늦게 추락 판정이 발생했다.
+- 충분히 점프한 것처럼 보이는데도 `FELL THROUGH BROKEN BRIDGE`가 표시됐다.
+
+### 원인
+
+가까운 BrokenBridge는 장애물 중심을 기준으로 `y - 2`, `y - 1`, `y`의 세 행에 그려진다.
+
+```cpp
+drawGapRow(y - 2, "/\\", Craft::Color::BrightWhite);
+drawGapRow(y - 1, "~-", Craft::Color::Blue);
+drawGapRow(y, "\\/", Craft::Color::BrightWhite);
+```
+
+하지만 충돌은 `obstacleScreenY - 1`을 기준으로 검사했다. 실제 앞쪽 균열선인 `y - 2`보다 한 줄 늦은 위치에서 점프 높이를 판단하고 있었다.
+
+### 해결 방법
+
+다리의 접촉 위치를 실제 앞쪽 균열선과 같은 `y - 2`로 맞췄다.
+
+```cpp
+const int contactScreenY = isBrokenBridge
+    ? obstacleScreenY - 2
+    : obstacleScreenY;
+```
+
+또한 이전 프레임과 현재 프레임의 균열선 위치를 비교하여, 균열선이 펭귄 발 행을 통과한 순간에만 점프 높이를 검사하도록 변경했다.
+
+```cpp
+const bool crossedBridgeEntry =
+    previousContactScreenY <= currentPlayerScreenY
+    && contactScreenY >= currentPlayerScreenY;
+```
+
+통과 조건은 논리적 점프 높이 `0.6` 이상으로 유지했다.
+
+```cpp
+const bool clearedBrokenBridge = isBrokenBridge
+    && player->GetJumpHeight() >= 0.6f;
+```
+
+판정 위치와 난이도 수치를 동시에 바꾸지 않음으로써, 문제가 충돌 시점 때문인지 점프 요구 높이 때문인지 따로 검증할 수 있도록 했다.
+
+### 검증 결과
+
+- Debug x64 빌드 성공
+- LowSpike는 발 행을 통과하는 프레임에 판정
+- BrokenBridge는 앞쪽 균열선이 발 행을 통과하는 프레임에 판정
+- 빠른 속도에서도 이전·현재 행 사이를 검사하여 충돌 누락 방지
+
+### 남은 플레이 테스트
+
+- 다리 균열선과 실제 추락 시점이 화면상 일치하는지 확인
+- 후반 속도에서 점프 높이 `0.6`의 허용 시간이 충분한지 확인
+- LowSpike가 몸 중앙을 통과할 때 정상적으로 충돌하는지 확인
+- 장애물을 옆으로 피했을 때 불필요한 충돌이 발생하지 않는지 확인
+
+### 추가 조정: 판정이 한 줄 빨랐던 문제
+
+앞쪽 흰 균열선인 `y - 2`는 다리가 깨졌다는 것을 보여주는 장식선이고, 실제로 빠지는 공간은 파란 물이 표시되는 `y - 1`이었다. 흰 선을 접촉 기준으로 사용하자 펭귄이 아직 틈에 진입하지 않았는데도 추락 판정이 발생했다.
+
+따라서 BrokenBridge의 접촉 기준을 실제 물 구간과 같은 `y - 1`로 변경했다.
+
+```cpp
+const int contactScreenY = isBrokenBridge
+    ? obstacleScreenY - 1
+    : obstacleScreenY;
+```
+
+이전·현재 프레임 사이의 행 통과 검사는 그대로 유지하므로, 후반 속도에서도 실제 틈의 시작 행을 건너뛴 순간을 놓치지 않는다.

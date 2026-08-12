@@ -174,6 +174,9 @@ void PolarLevel::CheckObstacleCollisions()
 		const int contactScreenY = isBrokenBridge
 			? obstacleScreenY - 1
 			: obstacleScreenY;
+		const int previousContactScreenY = isBrokenBridge
+			? previousObstacleScreenY - 1
+			: previousObstacleScreenY;
 		if (obstacle->GetDistance() < -2.0f)
 		{
 			obstacle->MarkChecked();
@@ -192,9 +195,13 @@ void PolarLevel::CheckObstacleCollisions()
 		const bool crossedPlayerRow =
 			previousObstacleScreenY <= currentPlayerScreenY
 			&& obstacleScreenY >= currentPlayerScreenY;
+		// The blue water row is the actual gap. The white row above it is only a
+		// visual crack, so it must not trigger an early fall.
+		const bool crossedBridgeEntry =
+			previousContactScreenY <= currentPlayerScreenY
+			&& contactScreenY >= currentPlayerScreenY;
 		const bool reachesPlayer = isBrokenBridge
-			? contactScreenY >= currentPlayerScreenY
-				&& contactScreenY <= currentPlayerScreenY + 1
+			? crossedBridgeEntry
 			: crossedPlayerRow;
 		const bool clearedLowSpike =
 			obstacle->GetObstacleType() == ObstacleType::LowSpike
@@ -211,7 +218,7 @@ void PolarLevel::CheckObstacleCollisions()
 			return;
 		}
 		if ((!isBrokenBridge && obstacleScreenY > currentPlayerScreenY)
-			|| (isBrokenBridge && contactScreenY > currentPlayerScreenY + 1))
+			|| (isBrokenBridge && contactScreenY > currentPlayerScreenY))
 		{
 			obstacle->MarkChecked();
 		}
@@ -403,6 +410,7 @@ void PolarLevel::HandleMenuInput()
 		if (input.GetKeyDown(VK_ESCAPE))
 		{
 			selectedMenuItem = MenuItem::Resume;
+			stateBeforePause = State::Playing;
 			state = State::PauseMenu;
 		}
 		return;
@@ -412,7 +420,7 @@ void PolarLevel::HandleMenuInput()
 	{
 		if (input.GetKeyDown(VK_ESCAPE))
 		{
-			state = State::Playing;
+			state = stateBeforePause;
 			return;
 		}
 
@@ -433,7 +441,7 @@ void PolarLevel::HandleMenuInput()
 			switch (selectedMenuItem)
 			{
 			case MenuItem::Resume:
-				state = State::Playing;
+				state = stateBeforePause;
 				break;
 			case MenuItem::Retry:
 				RetryGame();
@@ -448,10 +456,18 @@ void PolarLevel::HandleMenuInput()
 		return;
 	}
 
-	if ((state == State::Crashed || state == State::Goal)
-		&& input.GetKeyDown('R'))
+	if (state == State::Crashed || state == State::Goal)
 	{
-		RetryGame();
+		if (input.GetKeyDown(VK_ESCAPE))
+		{
+			stateBeforePause = state;
+			selectedMenuItem = MenuItem::Retry;
+			state = State::PauseMenu;
+		}
+		else if (input.GetKeyDown('R'))
+		{
+			RetryGame();
+		}
 	}
 }
 
@@ -813,8 +829,9 @@ void PolarLevel::DrawStartMenu()
 
 void PolarLevel::DrawPauseMenu()
 {
-	const char* items[] = { "RESUME", "RETRY", "QUIT" };
-	const std::string title = "PAUSED";
+	const bool canResume = stateBeforePause == State::Playing;
+	const char* items[] = { canResume ? "RESUME" : "BACK", "RETRY", "QUIT" };
+	const std::string title = canResume ? "PAUSED" : "MENU";
 	const int centerY = screenHeight / 2;
 	Craft::Renderer::Get().Submit(title,
 		Craft::Vector2(screenWidth / 2 - static_cast<int>(title.size()) / 2,
@@ -829,7 +846,10 @@ void PolarLevel::DrawPauseMenu()
 				centerY - 1 + index),
 			selected ? Craft::Color::Cyan : Craft::Color::BrightWhite, 3000);
 	}
-	Craft::Renderer::Get().Submit("UP/DOWN + ENTER   ESC : RESUME",
+	const std::string footer = canResume
+		? "UP/DOWN + ENTER   ESC : RESUME"
+		: "UP/DOWN + ENTER   ESC : BACK";
+	Craft::Renderer::Get().Submit(footer,
 		Craft::Vector2(screenWidth / 2 - 16, centerY + 4),
 		Craft::Color::BrightWhite, 3000);
 }

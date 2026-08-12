@@ -129,7 +129,7 @@ void PolarPlayer::Draw()
 		Craft::Renderer::Get().Submit(" (o o)", Craft::Vector2(x - 3, y - 3), Craft::Color::BrightWhite, 100);
 		Craft::Renderer::Get().Submit(" / V \\", Craft::Vector2(x - 3, y - 2), Craft::Color::BrightWhite, 100);
 		Craft::Renderer::Get().Submit("/( _ )\\", Craft::Vector2(x - 3, y - 1), Craft::Color::BrightWhite, 100);
-		Craft::Renderer::Get().Submit("  ^ ^", Craft::Vector2(x - 2, y), Craft::Color::Yellow, 100);
+		Craft::Renderer::Get().Submit("^ ^", Craft::Vector2(x - 1, y), Craft::Color::Yellow, 100);
 	}
 	else
 	{

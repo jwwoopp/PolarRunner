@@ -137,14 +137,39 @@ void PolarLevel::BuildTestCourse()
 			wall(lane, distance);
 		}
 	};
+	const auto doubleWall = [&](int safeLaneIndex, float distance)
+	{
+		for (int laneIndex = 0; laneIndex < 3; ++laneIndex)
+		{
+			if (laneIndex != safeLaneIndex)
+			{
+				wall(lanes[laneIndex], distance);
+			}
+		}
+	};
+	const auto isInsideAuthoredPattern = [](float distance)
+	{
+		constexpr float safeSpacing = 35.0f;
+		const bool nearDoubleWall = std::abs(distance - 400.0f) < safeSpacing
+			|| std::abs(distance - 650.0f) < safeSpacing
+			|| std::abs(distance - 930.0f) < safeSpacing;
+		const bool nearComboPattern =
+			(distance >= 225.0f && distance <= 303.0f)
+			|| (distance >= 475.0f && distance <= 553.0f)
+			|| (distance >= 675.0f && distance <= 749.0f);
+		return nearDoubleWall || nearComboPattern;
+	};
 
 	// One obstacle per distance guarantees at least two lateral escape routes.
 	// Spacing becomes shorter as the course progresses, so later sections ask
 	// for more frequent decisions without creating impossible lane walls.
 	for (float distance = 125.0f; distance < 730.0f;)
 	{
-		const auto [lane, type] = randomObstacle();
-		spawnObstacle(lane, distance, type);
+		if (!isInsideAuthoredPattern(distance))
+		{
+			const auto [lane, type] = randomObstacle();
+			spawnObstacle(lane, distance, type);
+		}
 
 		if (distance < 300.0f)
 		{
@@ -160,6 +185,19 @@ void PolarLevel::BuildTestCourse()
 		}
 	}
 
+	// Fixed tutorial patterns verify that two blocked lanes remain readable.
+	doubleWall(2, 400.0f); // Left + center blocked; right is safe.
+	doubleWall(0, 650.0f); // Center + right blocked; left is safe.
+
+	// Short authored combinations behave like input sentences: steer first,
+	// then immediately decide whether to steer again or jump.
+	wall(lanes[0], 250.0f);
+	spike(lanes[1], 278.0f);
+	puddle(lanes[1], 500.0f);
+	wall(lanes[2], 528.0f);
+	wall(lanes[2], 700.0f);
+	spike(lanes[0], 724.0f);
+
 	// Broken bridges stay inside the narrow-path section, but their exact
 	// positions vary while retaining enough recovery distance between jumps.
 	std::uniform_real_distribution<float> bridgeJitter(-8.0f, 8.0f);
@@ -171,9 +209,13 @@ void PolarLevel::BuildTestCourse()
 	for (float distance = 905.0f; distance < 980.0f;
 		distance += randomSpacing(30.0f, 45.0f))
 	{
-		const auto [lane, type] = randomObstacle();
-		spawnObstacle(lane, distance, type);
+		if (!isInsideAuthoredPattern(distance))
+		{
+			const auto [lane, type] = randomObstacle();
+			spawnObstacle(lane, distance, type);
+		}
 	}
+	doubleWall(1, 930.0f); // Left + right blocked; center is safe.
 }
 
 void PolarLevel::Tick(float deltaTime)
@@ -188,6 +230,7 @@ void PolarLevel::Tick(float deltaTime)
 	UpdateRunSpeed(deltaTime);
 	Level::Tick(deltaTime);
 	traveledDistance += runSpeed * deltaTime;
+	UpdateSpeedNotification(deltaTime);
 	CheckTerrainHazards();
 	CheckObstacleCollisions();
 	if (traveledDistance >= courseDistance && IsPlaying())
@@ -576,6 +619,22 @@ void PolarLevel::UpdateRunSpeed(float deltaTime)
 	runSpeed += (targetSpeed - runSpeed) * speedBlend;
 }
 
+void PolarLevel::UpdateSpeedNotification(float deltaTime)
+{
+	speedNotificationTimer = (std::max)(
+		0.0f, speedNotificationTimer - deltaTime);
+
+	constexpr float thresholds[] = { 250.0f, 500.0f, 750.0f };
+	const char* messages[] = { "SPEED UP!", "SPEED UP!!", "HIGH SPEED!" };
+	while (speedNotificationStage < 3
+		&& traveledDistance >= thresholds[speedNotificationStage])
+	{
+		speedNotification = messages[speedNotificationStage];
+		speedNotificationTimer = 1.2f;
+		++speedNotificationStage;
+	}
+}
+
 void PolarLevel::DrawSkyAndHorizon()
 {
 	// The sky and horizon stay screen-fixed; only the road projection curves.
@@ -843,6 +902,15 @@ void PolarLevel::DrawHud()
 		Craft::Color::BrightWhite, 1000);
 	Craft::Renderer::Get().Submit("ARROWS: Glide / Forward / Back   SPACE: Jump   ESC: Menu",
 		Craft::Vector2(1, 1), Craft::Color::Cyan, 1000);
+	if (speedNotificationTimer > 0.0f)
+	{
+		Craft::Renderer::Get().Submit(speedNotification,
+			Craft::Vector2(screenWidth / 2
+				- static_cast<int>(speedNotification.size()) / 2, 3),
+			speedNotificationStage >= 3
+				? Craft::Color::Yellow : Craft::Color::Cyan,
+			1600);
+	}
 	if (IsPlaying() && IsOnNarrowIcePath())
 	{
 		constexpr float warningBoundary = 0.90f;

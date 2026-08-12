@@ -97,37 +97,48 @@ void PolarObstacle::Draw()
 				Craft::Vector2(x - static_cast<int>(row.size()) / 2, y + yOffset),
 				obstacleColor, y + 10);
 		};
-		if (closeness > 0.80f)
+		if (closeness > 0.72f)
 		{
 			if (visualVariant == 0)
 			{
-				drawCentered("/------\\", -5);
-				drawCentered("|######|", -4);
+				drawCentered("  /\\/\\  ", -5);
+				drawCentered(" /####\\ ", -4);
+				drawCentered("/######\\", -3);
+				drawCentered("|######|", -2);
+				drawCentered("|######|", -1);
+				image = "|######|";
+			}
+			else if (visualVariant == 1)
+			{
+				drawCentered(" /\\  /\\ ", -5);
+				drawCentered("/##\\/##\\", -4);
 				drawCentered("|######|", -3);
 				drawCentered("|######|", -2);
 				drawCentered("|######|", -1);
-				image = "\\______/";
+				image = "|######|";
 			}
 			else
 			{
-				drawCentered("/^^^^\\", -5);
-				drawCentered("|####|", -4);
-				drawCentered("|####|", -3);
-				drawCentered("|####|", -2);
-				drawCentered("|####|", -1);
-				image = "\\____/";
+				drawCentered("   /\\   ", -5);
+				drawCentered("  /##\\  ", -4);
+				drawCentered(" /####\\ ", -3);
+				drawCentered("/######\\", -2);
+				drawCentered("|##/\\##|", -1);
+				image = "|_/  \\_|";
 			}
 		}
-		else if (closeness > 0.55f)
+		else if (closeness > 0.30f)
 		{
-			drawCentered(visualVariant == 0 ? "/---\\" : "/^^\\", -2);
-			drawCentered(visualVariant == 0 ? "|###|" : "|##|", -1);
-			image = visualVariant == 0 ? "|###|" : "\\__/";
+			const std::string roof = visualVariant == 0 ? " /\\/\\ "
+				: (visualVariant == 1 ? "/\\  /\\" : "  /\\  ");
+			drawCentered(roof, -2);
+			drawCentered(visualVariant == 2 ? " /##\\ " : "/####\\", -1);
+			image = visualVariant == 2 ? "|_/\\_|" : "|####|";
 		}
 		else
 		{
-			image = visualVariant == 0 ? "[]"
-				: (visualVariant == 1 ? "I" : "<>");
+			image = visualVariant == 0 ? "/\\"
+				: (visualVariant == 1 ? "/^\\" : "/|\\");
 		}
 	}
 

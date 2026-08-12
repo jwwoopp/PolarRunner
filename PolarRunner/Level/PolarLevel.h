@@ -2,6 +2,7 @@
 
 #include <Game/ObstacleType.h>
 #include <Level/Level.h>
+#include <string>
 #include <vector>
 
 class PolarObstacle;
@@ -73,6 +74,7 @@ private:
 	void DrawHud();
 	float GetDisplayDistanceMeters() const;
 	void UpdateRunSpeed(float deltaTime);
+	void UpdateSpeedNotification(float deltaTime);
 	void UpdateCurve(float deltaTime);
 	
 	// 추가
@@ -111,6 +113,9 @@ private:
 	float courseDistance = 1000.0f;
 	float traveledDistance = 0.0f;
 	float curveStrength = 0.0f;
+	float speedNotificationTimer = 0.0f;
+	int speedNotificationStage = 0;
+	std::string speedNotification;
 	State state = State::StartMenu;
 	State stateBeforePause = State::Playing;
 	MenuItem selectedMenuItem = MenuItem::Resume;

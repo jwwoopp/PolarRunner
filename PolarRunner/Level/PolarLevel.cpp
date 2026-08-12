@@ -12,6 +12,7 @@
 #include <iomanip>
 #include <random>
 #include <sstream>
+#include <utility>
 
 void PolarLevel::OnInitialized()
 {
@@ -103,21 +104,45 @@ void PolarLevel::BuildTestCourse()
 	const float lanes[] = { -0.55f, 0.0f, 0.55f };
 	std::uniform_int_distribution<int> laneChoice(0, 2);
 	std::uniform_int_distribution<int> typeChoice(0, 1);
-	std::uniform_real_distribution<float> spacingChoice(48.0f, 72.0f);
+	const auto randomSpacing = [&random](float minimum, float maximum)
+	{
+		return std::uniform_real_distribution<float>(minimum, maximum)(random);
+	};
+	const auto randomObstacle = [&]()
+	{
+		return std::pair<float, ObstacleType>(
+			lanes[laneChoice(random)],
+			typeChoice(random) == 0
+				? ObstacleType::LowSpike
+				: ObstacleType::IceWall);
+	};
 
 	// One obstacle per distance guarantees at least two lateral escape routes.
-	// Spacing is also randomized, so Retry produces a different rhythm.
-	for (float distance = 125.0f; distance < 730.0f;
-		distance += spacingChoice(random))
+	// Spacing becomes shorter as the course progresses, so later sections ask
+	// for more frequent decisions without creating impossible lane walls.
+	for (float distance = 125.0f; distance < 730.0f;)
 	{
-		const float lane = lanes[laneChoice(random)];
-		if (typeChoice(random) == 0)
+		const auto [lane, type] = randomObstacle();
+		if (type == ObstacleType::LowSpike)
 		{
 			spike(lane, distance);
 		}
 		else
 		{
 			wall(lane, distance);
+		}
+
+		if (distance < 300.0f)
+		{
+			distance += randomSpacing(65.0f, 80.0f);
+		}
+		else if (distance < 550.0f)
+		{
+			distance += randomSpacing(50.0f, 65.0f);
+		}
+		else
+		{
+			distance += randomSpacing(35.0f, 50.0f);
 		}
 	}
 
@@ -127,9 +152,21 @@ void PolarLevel::BuildTestCourse()
 	brokenBridge(790.0f + bridgeJitter(random));
 	brokenBridge(850.0f + bridgeJitter(random));
 
-	std::uniform_real_distribution<float> finalLane(-0.55f, 0.55f);
-	spike(finalLane(random), 915.0f);
-	wall(finalLane(random), 965.0f);
+	// Increase the final snowfield density after the bridge section. Each row
+	// still contains only one obstacle, leaving a readable escape route.
+	for (float distance = 905.0f; distance < 980.0f;
+		distance += randomSpacing(30.0f, 45.0f))
+	{
+		const auto [lane, type] = randomObstacle();
+		if (type == ObstacleType::LowSpike)
+		{
+			spike(lane, distance);
+		}
+		else
+		{
+			wall(lane, distance);
+		}
+	}
 }
 
 void PolarLevel::Tick(float deltaTime)
@@ -499,15 +536,23 @@ const char* PolarLevel::GetCurveDirection() const
 
 void PolarLevel::UpdateRunSpeed(float deltaTime)
 {
-	const float baseSpeed = std::abs(curveStrength) > 0.08f ? 14.0f : 16.0f;
+	constexpr float startSpeed = 16.0f;
+	constexpr float maximumProgressSpeed = 28.0f;
+	constexpr float maximumForwardBonus = 2.0f;
+	constexpr float maximumCurvePenalty = 2.0f;
+
 	const float courseProgress = std::clamp(
 		traveledDistance / courseDistance, 0.0f, 1.0f);
-	const float distanceSpeedBonus = courseProgress * 8.0f;
+	const float progressionSpeed = startSpeed
+		+ (maximumProgressSpeed - startSpeed) * courseProgress;
 	const float forwardAmount = player ? std::clamp(
 		-static_cast<float>(player->GetLongitudinalScreenOffset()) / 8.0f,
 		0.0f, 1.0f) : 0.0f;
-	const float targetSpeed = baseSpeed + distanceSpeedBonus
-		+ forwardAmount * 3.0f;
+	const float curveAmount = std::clamp(
+		std::abs(curveStrength) / 0.6f, 0.0f, 1.0f);
+	const float targetSpeed = progressionSpeed
+		+ forwardAmount * maximumForwardBonus
+		- curveAmount * maximumCurvePenalty;
 	const float speedBlend = (std::min)(deltaTime * 2.5f, 1.0f);
 	runSpeed += (targetSpeed - runSpeed) * speedBlend;
 }

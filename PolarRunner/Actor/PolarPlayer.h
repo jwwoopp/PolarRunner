@@ -29,6 +29,7 @@ private:
 	float horizontalHalfWidth = 0.13f;
 	float horizontalVelocity = 0.0f;
 	float horizontalSpeed = 1.8f;
+	bool isFacingRight = false;
 	float longitudinalScreenOffset = 0.0f;
 	float longitudinalSpeed = 7.0f;
 	bool isJumping = false;

@@ -273,3 +273,12 @@ const int contactScreenY = isBrokenBridge
 ```
 
 이전·현재 프레임 사이의 행 통과 검사는 그대로 유지하므로, 후반 속도에서도 실제 틈의 시작 행을 건너뛴 순간을 놓치지 않는다.
+
+---
+
+## Level 역할 분리
+
+- 최초 타이틀 화면과 입력을 `TitleLevel`로 분리했다.
+- `TitleLevel`은 Enter로 `PolarLevel`을 시작하고 Esc로 게임을 종료한다.
+- `PolarLevel`은 실제 주행과 플레이 중 일시정지 메뉴만 담당한다.
+- 함수 종류별로 하나의 Level 클래스를 여러 cpp 파일에 나누지 않고, 참고 프로젝트처럼 역할이 다른 Level을 별도 클래스로 구성했다.

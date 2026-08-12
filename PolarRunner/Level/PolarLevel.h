@@ -7,6 +7,7 @@
 
 class PolarObstacle;
 class PolarPlayer;
+class PolarStar;
 
 class PolarLevel : public Craft::Level
 {
@@ -56,6 +57,7 @@ private:
 	void BuildRoadCourse();
 	void BuildTestCourse();
 	void CheckObstacleCollisions();
+	void CheckStarCollections();
 	void CheckTerrainHazards();
 	void DrawSkyAndHorizon();
 	void DrawPerspectiveRoad();
@@ -113,6 +115,8 @@ private:
 	float curveStrength = 0.0f;
 	float speedNotificationTimer = 0.0f;
 	int speedNotificationStage = 0;
+	int collectedStarCount = 0;
+	static constexpr int RequiredStarCount = 5;
 	std::string speedNotification;
 	State state = State::Playing;
 	State stateBeforePause = State::Playing;
@@ -123,4 +127,5 @@ private:
 	std::shared_ptr<PolarPlayer> player;
 	std::vector<RoadSlice> roadSlices;
 	std::vector<std::shared_ptr<PolarObstacle>> obstacles;
+	std::vector<std::shared_ptr<PolarStar>> stars;
 };

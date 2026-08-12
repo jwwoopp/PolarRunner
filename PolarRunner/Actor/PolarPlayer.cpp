@@ -28,6 +28,14 @@ void PolarPlayer::Tick(float deltaTime)
 	const float horizontalInput =
 		(input.GetKey(VK_RIGHT) ? 1.0f : 0.0f)
 		- (input.GetKey(VK_LEFT) ? 1.0f : 0.0f);
+	if (horizontalInput > 0.0f)
+	{
+		isFacingRight = true;
+	}
+	else if (horizontalInput < 0.0f)
+	{
+		isFacingRight = false;
+	}
 	// Narrow ice has lower friction: steering builds more slowly and releasing
 	// the key preserves sideways momentum long enough to require correction.
 	const bool isOnNarrowIce = level->IsOnNarrowIcePath();
@@ -137,7 +145,11 @@ void PolarPlayer::Draw()
 	}
 	else
 	{
-		Craft::Renderer::Get().Submit(" <(o)___", Craft::Vector2(x - 4, y - 1), Craft::Color::BrightWhite, 100);
-		Craft::Renderer::Get().Submit("____(_____)", Craft::Vector2(x - 6, y), Craft::Color::BrightWhite, 100);
+		const char* head = isFacingRight ? "___(o)> " : " <(o)___";
+		const char* body = isFacingRight ? "(_____)____" : "____(_____)";
+		Craft::Renderer::Get().Submit(head, Craft::Vector2(x - 4, y - 1),
+			Craft::Color::BrightWhite, 100);
+		Craft::Renderer::Get().Submit(body, Craft::Vector2(x - 5, y),
+			Craft::Color::BrightWhite, 100);
 	}
 }

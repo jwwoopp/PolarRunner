@@ -2,12 +2,14 @@
 
 #include <Actor/PolarObstacle.h>
 #include <Actor/PolarPlayer.h>
+#include <Actor/PolarStar.h>
 #include <Engine/Engine.h>
 #include <Input/Input.h>
 #include <Math/Color.h>
 #include <Render/Renderer.h>
 #include <Windows.h>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <iomanip>
 #include <random>
@@ -104,8 +106,17 @@ void PolarLevel::BuildTestCourse()
 	// decisions begin.
 	spike(0.0f, 55.0f);
 
-	std::random_device seed;
-	std::mt19937 random(seed());
+	static unsigned int retrySequence = 0;
+	std::random_device randomDevice;
+	const unsigned long long clockSeed = static_cast<unsigned long long>(
+		std::chrono::high_resolution_clock::now().time_since_epoch().count());
+	std::seed_seq seed
+	{
+		randomDevice(), randomDevice(), retrySequence++,
+		static_cast<unsigned int>(clockSeed),
+		static_cast<unsigned int>(clockSeed >> 32)
+	};
+	std::mt19937 random(seed);
 	const float lanes[] = { -0.55f, 0.0f, 0.55f };
 	std::uniform_int_distribution<int> laneChoice(0, 2);
 	std::uniform_int_distribution<int> typeChoice(0, 2);
@@ -147,17 +158,39 @@ void PolarLevel::BuildTestCourse()
 			}
 		}
 	};
-	const auto isInsideAuthoredPattern = [](float distance)
+	std::uniform_real_distribution<float> patternJitter(-10.0f, 10.0f);
+	const float doubleWallDistances[] =
+	{
+		400.0f + patternJitter(random),
+		650.0f + patternJitter(random),
+		930.0f + patternJitter(random)
+	};
+	const float comboStarts[] =
+	{
+		250.0f + patternJitter(random),
+		500.0f + patternJitter(random),
+		700.0f + patternJitter(random)
+	};
+	const auto isInsideAuthoredPattern =
+		[&doubleWallDistances, &comboStarts](float distance)
 	{
 		constexpr float safeSpacing = 35.0f;
-		const bool nearDoubleWall = std::abs(distance - 400.0f) < safeSpacing
-			|| std::abs(distance - 650.0f) < safeSpacing
-			|| std::abs(distance - 930.0f) < safeSpacing;
-		const bool nearComboPattern =
-			(distance >= 225.0f && distance <= 303.0f)
-			|| (distance >= 475.0f && distance <= 553.0f)
-			|| (distance >= 675.0f && distance <= 749.0f);
-		return nearDoubleWall || nearComboPattern;
+		for (float patternDistance : doubleWallDistances)
+		{
+			if (std::abs(distance - patternDistance) < safeSpacing)
+			{
+				return true;
+			}
+		}
+		for (float patternStart : comboStarts)
+		{
+			if (distance >= patternStart - 25.0f
+				&& distance <= patternStart + 55.0f)
+			{
+				return true;
+			}
+		}
+		return false;
 	};
 
 	// One obstacle per distance guarantees at least two lateral escape routes.
@@ -185,18 +218,33 @@ void PolarLevel::BuildTestCourse()
 		}
 	}
 
-	// Fixed tutorial patterns verify that two blocked lanes remain readable.
-	doubleWall(2, 400.0f); // Left + center blocked; right is safe.
-	doubleWall(0, 650.0f); // Center + right blocked; left is safe.
+	// Retry changes each safe lane and shifts the pattern slightly while still
+	// guaranteeing that every double wall leaves one route open.
+	for (float patternDistance : doubleWallDistances)
+	{
+		doubleWall(laneChoice(random), patternDistance);
+	}
 
 	// Short authored combinations behave like input sentences: steer first,
 	// then immediately decide whether to steer again or jump.
-	wall(lanes[0], 250.0f);
-	spike(lanes[1], 278.0f);
-	puddle(lanes[1], 500.0f);
-	wall(lanes[2], 528.0f);
-	wall(lanes[2], 700.0f);
-	spike(lanes[0], 724.0f);
+	const ObstacleType firstTypes[] =
+	{
+		ObstacleType::IceWall, ObstacleType::Puddle, ObstacleType::IceWall
+	};
+	const ObstacleType secondTypes[] =
+	{
+		ObstacleType::LowSpike, ObstacleType::IceWall, ObstacleType::LowSpike
+	};
+	std::uniform_int_distribution<int> turnChoice(1, 2);
+	for (int patternIndex = 0; patternIndex < 3; ++patternIndex)
+	{
+		const int firstLane = laneChoice(random);
+		const int secondLane = (firstLane + turnChoice(random)) % 3;
+		spawnObstacle(lanes[firstLane], comboStarts[patternIndex],
+			firstTypes[patternIndex]);
+		spawnObstacle(lanes[secondLane], comboStarts[patternIndex]
+			+ randomSpacing(24.0f, 30.0f), secondTypes[patternIndex]);
+	}
 
 	// Broken bridges stay inside the narrow-path section, but their exact
 	// positions vary while retaining enough recovery distance between jumps.
@@ -215,7 +263,47 @@ void PolarLevel::BuildTestCourse()
 			spawnObstacle(lane, distance, type);
 		}
 	}
-	doubleWall(1, 930.0f); // Left + right blocked; center is safe.
+	// Obstacles are finalized before collectibles. Each star then selects a lane
+	// with enough same-lane clearance; obstacles in other lanes remain allowed.
+	const float starDistances[] =
+	{
+		90.0f, 195.0f, 315.0f, 450.0f, 575.0f, 750.0f, 890.0f
+	};
+	constexpr float starObstacleSpacing = 20.0f;
+	for (float starDistance : starDistances)
+	{
+		std::vector<int> safeLaneIndices;
+		for (int laneIndex = 0; laneIndex < 3; ++laneIndex)
+		{
+			bool isSafe = true;
+			for (const std::shared_ptr<PolarObstacle>& obstacle : obstacles)
+			{
+				const bool blocksEveryLane =
+					obstacle->GetObstacleType() == ObstacleType::BrokenBridge;
+				const bool sameLane = std::abs(obstacle->GetHorizontalPosition()
+					- lanes[laneIndex]) < 0.20f;
+				if ((blocksEveryLane || sameLane)
+					&& std::abs(obstacle->GetDistance() - starDistance)
+						< starObstacleSpacing)
+				{
+					isSafe = false;
+					break;
+				}
+			}
+			if (isSafe)
+			{
+				safeLaneIndices.emplace_back(laneIndex);
+			}
+		}
+		if (!safeLaneIndices.empty())
+		{
+			std::uniform_int_distribution<int> safeLaneChoice(
+				0, static_cast<int>(safeLaneIndices.size()) - 1);
+			const int laneIndex = safeLaneIndices[safeLaneChoice(random)];
+			stars.emplace_back(SpawnActor<PolarStar>(
+				lanes[laneIndex], starDistance));
+		}
+	}
 }
 
 void PolarLevel::Tick(float deltaTime)
@@ -233,9 +321,44 @@ void PolarLevel::Tick(float deltaTime)
 	UpdateSpeedNotification(deltaTime);
 	CheckTerrainHazards();
 	CheckObstacleCollisions();
+	CheckStarCollections();
 	if (traveledDistance >= courseDistance && IsPlaying())
 	{
 		state = State::Goal;
+	}
+}
+
+void PolarLevel::CheckStarCollections()
+{
+	if (!player)
+	{
+		return;
+	}
+
+	const int playerBaseY = GetPlayerScreenY() - player->GetJumpScreenOffset();
+	const int playerBodyTopY = player->IsJumping()
+		? playerBaseY - 3 : playerBaseY - 1;
+	const int playerBodyBottomY = player->IsJumping()
+		? playerBaseY - 1 : playerBaseY;
+	for (const std::shared_ptr<PolarStar>& star : stars)
+	{
+		if (!star || star->IsCollected() || star->HasExpired())
+		{
+			continue;
+		}
+
+		const int previousY = DistanceToScreenY(star->GetPreviousDistance());
+		const int currentY = DistanceToScreenY(star->GetDistance());
+		const bool crossedPlayerBody = previousY <= playerBodyBottomY
+			&& currentY >= playerBodyTopY;
+		const bool horizontalOverlap =
+			std::abs(player->GetHorizontalPosition()
+				- star->GetHorizontalPosition()) <= 0.18f;
+		if (crossedPlayerBody && horizontalOverlap)
+		{
+			star->Collect();
+			++collectedStarCount;
+		}
 	}
 }
 
@@ -884,7 +1007,8 @@ void PolarLevel::DrawHud()
 	}
 	hud << std::fixed << std::setprecision(1)
 		<< "  SPEED: " << runSpeed
-		<< "  ROAD: " << GetCurveDirection();
+		<< "  ROAD: " << GetCurveDirection()
+		<< "  STAR: " << collectedStarCount << " / " << RequiredStarCount;
 	Craft::Renderer::Get().Submit(hud.str(), Craft::Vector2(1, 0),
 		Craft::Color::BrightWhite, 1000);
 	Craft::Renderer::Get().Submit("ARROWS: Glide / Forward / Back   SPACE: Jump   ESC: Menu",
@@ -897,6 +1021,14 @@ void PolarLevel::DrawHud()
 			speedNotificationStage >= 3
 				? Craft::Color::Yellow : Craft::Color::Cyan,
 			1600);
+	}
+	if (collectedStarCount >= RequiredStarCount)
+	{
+		const std::string ready = "NON-LETHAL EQUIPMENT READY!";
+		Craft::Renderer::Get().Submit(ready,
+			Craft::Vector2(screenWidth / 2
+				- static_cast<int>(ready.size()) / 2, 2),
+			Craft::Color::Green, 1600);
 	}
 	if (IsPlaying() && IsOnNarrowIcePath())
 	{

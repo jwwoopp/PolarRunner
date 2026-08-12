@@ -8,6 +8,7 @@
 class PolarObstacle;
 class Player;
 class PolarStar;
+class Enemy;
 
 class PolarLevel : public Craft::Level
 {
@@ -59,6 +60,7 @@ private:
 	void CheckObstacleCollisions();
 	void CheckStarCollections();
 	void HandlePlayerFire();
+	void UpdateCoastEnemy(float deltaTime);
 	void CheckTerrainHazards();
 	void DrawSkyAndHorizon();
 	void DrawPerspectiveRoad();
@@ -130,4 +132,9 @@ private:
 	std::vector<RoadSlice> roadSlices;
 	std::vector<std::shared_ptr<PolarObstacle>> obstacles;
 	std::vector<std::shared_ptr<PolarStar>> stars;
+	std::shared_ptr<Enemy> coastEnemy;
+	bool hasSpawnedCoastEnemy = false;
+	float coastEnemyWarningTimer = 0.0f;
+	float enemyFireTimer = 0.0f;
+	float coastEnemyScreenX = 0.0f;
 };

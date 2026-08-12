@@ -39,7 +39,10 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Actor\Enemy.cpp">
-	  <Filter>Actor</Filter>
+      <Filter>Actor</Filter>
+    </ClCompile>
+    <ClCompile Include="Actor\EnemyBullet.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -68,7 +71,10 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Actor\Enemy.h">
-	  <Filter>Actor</Filter>
+      <Filter>Actor</Filter>
+    </ClInclude>
+    <ClInclude Include="Actor\EnemyBullet.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

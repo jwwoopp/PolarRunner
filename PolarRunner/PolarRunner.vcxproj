@@ -92,6 +92,7 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Actor\EnemyBullet.cpp" />
     <ClCompile Include="Actor\PlayerBullet.cpp" />
     <ClCompile Include="Actor\PolarObstacle.cpp" />
     <ClCompile Include="Actor\Player.cpp" />
@@ -103,6 +104,7 @@
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Actor\EnemyBullet.h" />
     <ClInclude Include="Actor\PlayerBullet.h" />
     <ClInclude Include="Actor\PolarObstacle.h" />
     <ClInclude Include="Actor\Player.h" />

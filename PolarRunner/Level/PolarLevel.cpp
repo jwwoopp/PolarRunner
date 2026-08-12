@@ -4,6 +4,8 @@
 #include <Actor/Player.h>
 #include <Actor/PlayerBullet.h>
 #include <Actor/PolarStar.h>
+#include <Actor/Enemy.h>
+#include <Actor/EnemyBullet.h>
 #include <Engine/Engine.h>
 #include <Input/Input.h>
 #include <Math/Color.h>
@@ -57,9 +59,10 @@ void PolarLevel::BuildRoadCourse()
 		{ 540.0f,  0.55f, 0.92f, TerrainType::ResearchBase },
 
 		// 넓은 설원
-		{ 580.0f,  0.00f, 1.30f, TerrainType::Snowfield },
-		{ 650.0f, -0.45f, 1.15f, TerrainType::Snowfield },
-		{ 710.0f,  0.45f, 1.10f, TerrainType::Snowfield },
+		// 다섯 번째 별 이후 밀렵선이 등장하는 두 번째 해안
+		{ 580.0f,  0.00f, 1.30f, TerrainType::Coast },
+		{ 650.0f, -0.45f, 1.15f, TerrainType::Coast },
+		{ 710.0f,  0.45f, 1.10f, TerrainType::Coast },
 
 		// 좁은 얼음다리
 		{ 750.0f,  0.00f, 0.55f, TerrainType::NarrowIcePath },
@@ -320,6 +323,7 @@ void PolarLevel::Tick(float deltaTime)
 	Level::Tick(deltaTime);
 	HandlePlayerFire();
 	traveledDistance += runSpeed * deltaTime;
+	UpdateCoastEnemy(deltaTime);
 	UpdateSpeedNotification(deltaTime);
 	CheckTerrainHazards();
 	CheckObstacleCollisions();
@@ -327,6 +331,102 @@ void PolarLevel::Tick(float deltaTime)
 	if (traveledDistance >= courseDistance && IsPlaying())
 	{
 		state = State::Goal;
+	}
+}
+
+void PolarLevel::UpdateCoastEnemy(float deltaTime)
+{
+	const TerrainType terrain = GetRoadProfile(traveledDistance).terrain;
+	if (!hasSpawnedCoastEnemy && terrain == TerrainType::Coast
+		&& nonShotCount > 0)
+	{
+		coastEnemyWarningTimer += deltaTime;
+		constexpr float warningDuration = 2.0f;
+		if (coastEnemyWarningTimer >= warningDuration)
+		{
+			constexpr float initialDistance = 95.0f;
+			coastEnemy = SpawnActor<Enemy>(initialDistance, EnemySide::Left);
+			coastEnemyScreenX = screenWidth * 0.18f;
+			hasSpawnedCoastEnemy = true;
+			coastEnemyWarningTimer = 0.0f;
+		}
+	}
+	else if (!hasSpawnedCoastEnemy)
+	{
+		coastEnemyWarningTimer = 0.0f;
+	}
+
+	if (!coastEnemy || coastEnemy->HasExpired())
+	{
+		return;
+	}
+
+	// 탄환이 생성되는 펭귄 머리 줄에 Enemy가 도달한 뒤 그 줄을 추적합니다.
+	const int chaseScreenY = GetPlayerScreenY() - 1;
+	const float chaseDistance = ScreenYToDistance(chaseScreenY);
+	coastEnemy->Advance(runSpeed * deltaTime, chaseDistance);
+	if (coastEnemy->HasExpired())
+	{
+		return;
+	}
+
+	const int screenY = DistanceToScreenY(coastEnemy->GetDistance());
+	const int roadCenterX = GetRoadCenterX(screenY);
+	const int roadHalfWidth = GetRoadHalfWidth(screenY);
+	// 배의 총구와 선체가 도로를 침범하지 않도록 충분한 간격을 둡니다.
+	constexpr int coastMargin = 8;
+
+	const int playerScreenX = GetRoadScreenX(
+		player->GetHorizontalPosition(), GetPlayerScreenY());
+	const int roadLeftX = roadCenterX - roadHalfWidth;
+	const int maximumEnemyX = roadLeftX
+		- coastEnemy->GetWidth() - coastMargin;
+	const int desiredEnemyX = (std::min)(
+		playerScreenX - 25, maximumEnemyX);
+
+	if (coastEnemy->GetState() == EnemyState::ClosingSide)
+	{
+		constexpr float sideApproachSpeed = 18.0f;
+		coastEnemyScreenX += sideApproachSpeed * deltaTime;
+		if (coastEnemyScreenX >= desiredEnemyX)
+		{
+			coastEnemyScreenX = static_cast<float>(desiredEnemyX);
+			coastEnemy->BeginChasing();
+		}
+	}
+	else if (coastEnemy->GetState() == EnemyState::Chasing)
+	{
+		const float blend = (std::min)(deltaTime * 5.0f, 1.0f);
+		coastEnemyScreenX +=
+			(desiredEnemyX - coastEnemyScreenX) * blend;
+	}
+
+	const int screenX = static_cast<int>(coastEnemyScreenX);
+	coastEnemy->SetPosition(Craft::Vector2(screenX, screenY));
+
+	// Enemy가 접근을 마치고 펭귄이 달리는 지면 근처까지 내려온 뒤 사격합니다.
+	const int enemyMuzzleX = screenX + coastEnemy->GetWidth();
+	const int horizontalDistance = std::abs(playerScreenX - enemyMuzzleX);
+	const int fireRange = std::clamp(screenWidth / 4, 20, 50);
+	const bool isPlayerInFireRange = horizontalDistance <= fireRange;
+	if (coastEnemy->GetState() == EnemyState::Chasing
+		&& isPlayerInFireRange)
+	{
+		enemyFireTimer += deltaTime;
+		constexpr float fireInterval = 2.0f;
+		if (enemyFireTimer >= fireInterval)
+		{
+			const Craft::Vector2 enemyPosition = coastEnemy->GetPosition();
+			const Craft::Vector2 bulletPosition(
+				enemyPosition.x + coastEnemy->GetWidth(),
+				enemyPosition.y);
+			SpawnActor<EnemyBullet>(bulletPosition);
+			enemyFireTimer = 0.0f;
+		}
+	}
+	else
+	{
+		enemyFireTimer = 0.0f;
 	}
 }
 
@@ -374,14 +474,23 @@ void PolarLevel::CheckStarCollections()
 			continue;
 		}
 
-		const int previousY = DistanceToScreenY(star->GetPreviousDistance());
 		const int currentY = DistanceToScreenY(star->GetDistance());
-		const bool crossedPlayerBody = previousY <= playerBodyBottomY
-			&& currentY >= playerBodyTopY;
+		// 현재 점프 자세의 몸통과 실제로 닿을 때만 수집합니다.
+		// 정수 화면 좌표 변환으로 한 줄을 놓치지 않도록 1칸만 허용합니다.
+		constexpr int collectionYTolerance = 1;
+		const bool overlapsPlayerBody =
+			currentY >= playerBodyTopY - collectionYTolerance
+			&& currentY <= playerBodyBottomY + collectionYTolerance;
+
+		// 논리 레인이 아니라 실제 화면 X와 펭귄 ASCII 폭을 비교합니다.
+		const int playerScreenX = GetRoadScreenX(
+			player->GetHorizontalPosition(), GetPlayerScreenY());
+		const int starScreenX = GetRoadScreenX(
+			star->GetHorizontalPosition(), currentY);
+		const int playerHalfWidth = player->IsJumping() ? 3 : 5;
 		const bool horizontalOverlap =
-			std::abs(player->GetHorizontalPosition()
-				- star->GetHorizontalPosition()) <= 0.18f;
-		if (crossedPlayerBody && horizontalOverlap)
+			std::abs(playerScreenX - starScreenX) <= playerHalfWidth;
+		if (overlapsPlayerBody && horizontalOverlap)
 		{
 			star->Collect();
 			++collectedStarCount;
@@ -1062,6 +1171,14 @@ void PolarLevel::DrawHud()
 			Craft::Vector2(screenWidth / 2
 				- static_cast<int>(ready.size()) / 2, 2),
 			Craft::Color::Green, 1600);
+	}
+	if (!hasSpawnedCoastEnemy && coastEnemyWarningTimer > 0.0f)
+	{
+		const std::string warning = "ENEMY SHIP APPROACHING!";
+		Craft::Renderer::Get().Submit(warning,
+			Craft::Vector2(screenWidth / 2
+				- static_cast<int>(warning.size()) / 2, 4),
+			Craft::Color::Red, 1700);
 	}
 	if (IsPlaying() && IsOnNarrowIcePath())
 	{

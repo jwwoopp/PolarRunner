@@ -46,7 +46,7 @@ const bool clearedBrokenBridge = isBrokenBridge
 게임에서 사용하는 논리적 점프 높이와 ASCII 출력용 위치를 분리했다.
 
 ```cpp
-float PolarPlayer::GetJumpHeight() const
+float Player::GetJumpHeight() const
 {
     if (!isJumping)
     {
@@ -57,7 +57,7 @@ float PolarPlayer::GetJumpHeight() const
     return std::sin(progress * 3.14159265f);
 }
 
-int PolarPlayer::GetJumpScreenOffset() const
+int Player::GetJumpScreenOffset() const
 {
     return static_cast<int>(GetJumpHeight() * 5.0f);
 }

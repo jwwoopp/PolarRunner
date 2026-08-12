@@ -2,12 +2,12 @@
 
 #include <Actor/Actor.h>
 
-class PolarPlayer : public Craft::Actor
+class Player : public Craft::Actor
 {
-	TYPE_DECLARATIONS(PolarPlayer, Craft::Actor)
+	TYPE_DECLARATIONS(Player, Craft::Actor)
 
 public:
-	PolarPlayer();
+	Player();
 	virtual void Tick(float deltaTime) override;
 	virtual void Draw() override;
 

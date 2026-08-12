@@ -1,4 +1,4 @@
-#include "PolarPlayer.h"
+#include "Player.h"
 
 #include <Engine/Engine.h>
 #include <Input/Input.h>
@@ -8,12 +8,12 @@
 #include <algorithm>
 #include <cmath>
 
-PolarPlayer::PolarPlayer()
+Player::Player()
 	: Actor("", Craft::Vector2::Zero, Craft::Color::Cyan)
 {
 }
 
-void PolarPlayer::Tick(float deltaTime)
+void Player::Tick(float deltaTime)
 {
 	Actor::Tick(deltaTime);
 	std::shared_ptr<PolarLevel> level
@@ -103,12 +103,12 @@ void PolarPlayer::Tick(float deltaTime)
 	}
 }
 
-bool PolarPlayer::IsAboveObstacle() const
+bool Player::IsAboveObstacle() const
 {
 	return GetJumpHeight() >= 0.4f;
 }
 
-float PolarPlayer::GetJumpHeight() const
+float Player::GetJumpHeight() const
 {
 	if (!isJumping)
 	{
@@ -118,12 +118,12 @@ float PolarPlayer::GetJumpHeight() const
 	return std::sin(progress * 3.14159265f);
 }
 
-int PolarPlayer::GetJumpScreenOffset() const
+int Player::GetJumpScreenOffset() const
 {
 	return static_cast<int>(GetJumpHeight() * 5.0f);
 }
 
-void PolarPlayer::Draw()
+void Player::Draw()
 {
 	std::shared_ptr<PolarLevel> level
 		= std::dynamic_pointer_cast<PolarLevel>(GetOwner());

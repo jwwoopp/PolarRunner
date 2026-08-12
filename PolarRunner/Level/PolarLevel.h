@@ -6,7 +6,7 @@
 #include <vector>
 
 class PolarObstacle;
-class PolarPlayer;
+class Player;
 class PolarStar;
 
 class PolarLevel : public Craft::Level
@@ -116,6 +116,7 @@ private:
 	float speedNotificationTimer = 0.0f;
 	int speedNotificationStage = 0;
 	int collectedStarCount = 0;
+	int nonLethalShotCount = 0;
 	static constexpr int RequiredStarCount = 5;
 	std::string speedNotification;
 	State state = State::Playing;
@@ -124,7 +125,7 @@ private:
 	ObstacleType crashedObstacleType = ObstacleType::LowSpike;
 	bool fellFromNarrowIcePath = false;
 	bool fellThroughBrokenBridge = false;
-	std::shared_ptr<PolarPlayer> player;
+	std::shared_ptr<Player> player;
 	std::vector<RoadSlice> roadSlices;
 	std::vector<std::shared_ptr<PolarObstacle>> obstacles;
 	std::vector<std::shared_ptr<PolarStar>> stars;

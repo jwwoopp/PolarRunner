@@ -1,7 +1,7 @@
 #include "PolarLevel.h"
 
 #include <Actor/PolarObstacle.h>
-#include <Actor/PolarPlayer.h>
+#include <Actor/Player.h>
 #include <Actor/PolarStar.h>
 #include <Engine/Engine.h>
 #include <Input/Input.h>
@@ -23,7 +23,7 @@ void PolarLevel::OnInitialized()
 	screenHeight = Craft::Engine::Get().GetHeight();
 	horizonY = 7;
 	playerScreenY = screenHeight - 6;
-	player = SpawnActor<PolarPlayer>();
+	player = SpawnActor<Player>();
 	BuildRoadCourse();
 	BuildTestCourse();
 }
@@ -358,6 +358,11 @@ void PolarLevel::CheckStarCollections()
 		{
 			star->Collect();
 			++collectedStarCount;
+			if (collectedStarCount >= RequiredStarCount)
+			{
+				collectedStarCount -= RequiredStarCount;
+				++nonLethalShotCount;
+			}
 		}
 	}
 }
@@ -1008,7 +1013,8 @@ void PolarLevel::DrawHud()
 	hud << std::fixed << std::setprecision(1)
 		<< "  SPEED: " << runSpeed
 		<< "  ROAD: " << GetCurveDirection()
-		<< "  STAR: " << collectedStarCount << " / " << RequiredStarCount;
+		<< "  STAR: " << collectedStarCount << " / " << RequiredStarCount
+		<< "  SHOT: " << nonLethalShotCount;
 	Craft::Renderer::Get().Submit(hud.str(), Craft::Vector2(1, 0),
 		Craft::Color::BrightWhite, 1000);
 	Craft::Renderer::Get().Submit("ARROWS: Glide / Forward / Back   SPACE: Jump   ESC: Menu",
@@ -1022,9 +1028,9 @@ void PolarLevel::DrawHud()
 				? Craft::Color::Yellow : Craft::Color::Cyan,
 			1600);
 	}
-	if (collectedStarCount >= RequiredStarCount)
+	if (nonLethalShotCount > 0)
 	{
-		const std::string ready = "NON-LETHAL EQUIPMENT READY!";
+		const std::string ready = "SHOT READY!";
 		Craft::Renderer::Get().Submit(ready,
 			Craft::Vector2(screenWidth / 2
 				- static_cast<int>(ready.size()) / 2, 2),

@@ -27,31 +27,24 @@ void TitleLevel::Draw()
 {
 	const int screenWidth = Craft::Engine::Get().GetWidth();
 	const int screenHeight = Craft::Engine::Get().GetHeight();
+	const int centerX = screenWidth / 2;
 	const int centerY = screenHeight / 2;
-	const std::string title = "POLAR RUNNER";
-	const std::string subtitle = "SOUTH POLE  ->  NORTH POLE";
-	const std::string start = "ENTER : START";
-	const std::string quit = "ESC : QUIT";
 
-	Craft::Renderer::Get().Submit(title,
-		Craft::Vector2(screenWidth / 2 - static_cast<int>(title.size()) / 2,
-			centerY - 6), Craft::Color::BrightWhite, 3000);
-	Craft::Renderer::Get().Submit(" _~_ ",
-		Craft::Vector2(screenWidth / 2 - 2, centerY - 4),
-		Craft::Color::Cyan, 3000);
-	Craft::Renderer::Get().Submit("(o o)",
-		Craft::Vector2(screenWidth / 2 - 2, centerY - 3),
-		Craft::Color::BrightWhite, 3000);
-	Craft::Renderer::Get().Submit("/ V \\",
-		Craft::Vector2(screenWidth / 2 - 2, centerY - 2),
-		Craft::Color::BrightWhite, 3000);
-	Craft::Renderer::Get().Submit(subtitle,
-		Craft::Vector2(screenWidth / 2 - static_cast<int>(subtitle.size()) / 2,
-			centerY), Craft::Color::Cyan, 3000);
-	Craft::Renderer::Get().Submit(start,
-		Craft::Vector2(screenWidth / 2 - static_cast<int>(start.size()) / 2,
-			centerY + 2), Craft::Color::Yellow, 3000);
-	Craft::Renderer::Get().Submit(quit,
-		Craft::Vector2(screenWidth / 2 - static_cast<int>(quit.size()) / 2,
-			centerY + 4), Craft::Color::BrightWhite, 3000);
+	// Centered title elements share the same positioning and sorting rule.
+	const auto drawCenter = [&](const std::string& text, int yOffset,
+		Craft::Color color)
+	{
+		const int posX = centerX - static_cast<int>(text.size()) / 2;
+		const int posY = centerY + yOffset;
+		Craft::Renderer::Get().Submit(text, Craft::Vector2(posX, posY),
+			color, 3000);
+	};
+
+	drawCenter("POLAR RUNNER", -6, Craft::Color::BrightWhite);
+	drawCenter(" _~_ ", -4, Craft::Color::Cyan);
+	drawCenter("(o o)", -3, Craft::Color::BrightWhite);
+	drawCenter("/ V \\", -2, Craft::Color::BrightWhite);
+	drawCenter("SOUTH POLE  ->  NORTH POLE", 0, Craft::Color::Cyan);
+	drawCenter("ENTER : START", 2, Craft::Color::Yellow);
+	drawCenter("ESC : QUIT", 4, Craft::Color::BrightWhite);
 }

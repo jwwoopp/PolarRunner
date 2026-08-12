@@ -46,6 +46,7 @@ public:
 	inline float GetRunSpeed() const { return runSpeed; }
 	inline float GetViewDistance() const { return viewDistance; }
 	inline bool IsPlaying() const { return state == State::Playing; }
+	bool IsOnNarrowIcePath() const;
 
 private:
 	float ScreenYToDistance(int screenY) const;
@@ -57,6 +58,7 @@ private:
 	void CheckTerrainHazards();
 	void DrawSkyAndHorizon();
 	void DrawPerspectiveRoad();
+	void DrawNarrowPathWarningSign();
 	void DrawSnowfieldRow(int y, float depth, const RoadSlice& slice);
 	void DrawCoastRow(int y, float depth, const RoadSlice& slice);
 	void DrawCanyonRow(int y, float depth, const RoadSlice& slice);

@@ -76,6 +76,7 @@ void PolarLevel::BuildTestCourse()
 	// match the near-camera four-column spike and eight-column wall sprites.
 	constexpr float spikeHalfWidth = 0.055f;
 	constexpr float wallHalfWidth = 0.11f;
+	constexpr float puddleHalfWidth = 0.16f;
 	const auto add = [this](float horizontalPosition, float distance,
 		ObstacleType type, float horizontalHalfWidth)
 	{
@@ -90,6 +91,10 @@ void PolarLevel::BuildTestCourse()
 	{
 		add(x, distance, ObstacleType::IceWall, wallHalfWidth);
 	};
+	const auto puddle = [&add](float x, float distance)
+	{
+		add(x, distance, ObstacleType::Puddle, puddleHalfWidth);
+	};
 	const auto brokenBridge = [&add](float distance)
 	{
 		add(0.0f, distance, ObstacleType::BrokenBridge, 1.0f);
@@ -103,18 +108,34 @@ void PolarLevel::BuildTestCourse()
 	std::mt19937 random(seed());
 	const float lanes[] = { -0.55f, 0.0f, 0.55f };
 	std::uniform_int_distribution<int> laneChoice(0, 2);
-	std::uniform_int_distribution<int> typeChoice(0, 1);
+	std::uniform_int_distribution<int> typeChoice(0, 2);
 	const auto randomSpacing = [&random](float minimum, float maximum)
 	{
 		return std::uniform_real_distribution<float>(minimum, maximum)(random);
 	};
 	const auto randomObstacle = [&]()
 	{
+		const int typeIndex = typeChoice(random);
+		const ObstacleType type = typeIndex == 0
+			? ObstacleType::LowSpike
+			: (typeIndex == 1 ? ObstacleType::IceWall : ObstacleType::Puddle);
 		return std::pair<float, ObstacleType>(
-			lanes[laneChoice(random)],
-			typeChoice(random) == 0
-				? ObstacleType::LowSpike
-				: ObstacleType::IceWall);
+			lanes[laneChoice(random)], type);
+	};
+	const auto spawnObstacle = [&](float lane, float distance, ObstacleType type)
+	{
+		if (type == ObstacleType::LowSpike)
+		{
+			spike(lane, distance);
+		}
+		else if (type == ObstacleType::Puddle)
+		{
+			puddle(lane, distance);
+		}
+		else
+		{
+			wall(lane, distance);
+		}
 	};
 
 	// One obstacle per distance guarantees at least two lateral escape routes.
@@ -123,14 +144,7 @@ void PolarLevel::BuildTestCourse()
 	for (float distance = 125.0f; distance < 730.0f;)
 	{
 		const auto [lane, type] = randomObstacle();
-		if (type == ObstacleType::LowSpike)
-		{
-			spike(lane, distance);
-		}
-		else
-		{
-			wall(lane, distance);
-		}
+		spawnObstacle(lane, distance, type);
 
 		if (distance < 300.0f)
 		{
@@ -158,14 +172,7 @@ void PolarLevel::BuildTestCourse()
 		distance += randomSpacing(30.0f, 45.0f))
 	{
 		const auto [lane, type] = randomObstacle();
-		if (type == ObstacleType::LowSpike)
-		{
-			spike(lane, distance);
-		}
-		else
-		{
-			wall(lane, distance);
-		}
+		spawnObstacle(lane, distance, type);
 	}
 }
 
@@ -237,10 +244,14 @@ void PolarLevel::CheckObstacleCollisions()
 		const bool spikeScreenOverlap =
 			playerCollisionX - 2 <= obstacleCollisionX + 1
 			&& playerCollisionX + 4 >= obstacleCollisionX - 2;
-		const bool horizontalOverlap =
-			obstacle->GetObstacleType() == ObstacleType::LowSpike
+		const bool puddleScreenOverlap =
+			playerCollisionX - 2 <= obstacleCollisionX + 3
+			&& playerCollisionX + 4 >= obstacleCollisionX - 4;
+		const ObstacleType obstacleType = obstacle->GetObstacleType();
+		const bool horizontalOverlap = obstacleType == ObstacleType::LowSpike
 			? spikeScreenOverlap
-			: normalizedHorizontalOverlap;
+			: (obstacleType == ObstacleType::Puddle
+				? puddleScreenOverlap : normalizedHorizontalOverlap);
 		// Collision occurs only when the projected obstacle crosses the penguin's
 		// foot row from above. The swept row test also works at high run speeds.
 		const bool crossedPlayerRow =
@@ -255,13 +266,15 @@ void PolarLevel::CheckObstacleCollisions()
 			? crossedBridgeEntry
 			: crossedPlayerRow;
 		const bool clearedLowSpike =
-			obstacle->GetObstacleType() == ObstacleType::LowSpike
+			obstacleType == ObstacleType::LowSpike
 			&& player->IsAboveObstacle();
+		const bool clearedPuddle = obstacleType == ObstacleType::Puddle
+			&& player->GetJumpHeight() >= 0.25f;
 		// 다리는 오직 펭귄이 충분히 뛰었을 때만 건너는 것이 가능(점프 높이 3 이상).
 		const bool clearedBrokenBridge = isBrokenBridge
 			&& player->GetJumpHeight() >= 0.6f;
 		if ((isBrokenBridge || horizontalOverlap) && reachesPlayer
-			&& !clearedLowSpike && !clearedBrokenBridge)
+			&& !clearedLowSpike && !clearedPuddle && !clearedBrokenBridge)
 		{
 			crashedObstacleType = obstacle->GetObstacleType();
 			fellThroughBrokenBridge = isBrokenBridge;
@@ -276,16 +289,21 @@ void PolarLevel::CheckObstacleCollisions()
 	}
 }
 
+bool PolarLevel::IsOnNarrowIcePath() const
+{
+	return GetRoadProfile(traveledDistance).terrain
+		== TerrainType::NarrowIcePath;
+}
+
 void PolarLevel::CheckTerrainHazards()
 {
-	if (!player || GetRoadProfile(traveledDistance).terrain
-		!= TerrainType::NarrowIcePath)
+	if (!player || !IsOnNarrowIcePath())
 	{
 		return;
 	}
-	// Leave a small warning margin near the rail instead of killing the player
-	// while the penguin still appears comfortably inside the bridge.
-	if (std::abs(player->GetHorizontalPosition()) > 0.98f)
+
+	constexpr float fallBoundary = 1.25f;
+	if (std::abs(player->GetHorizontalPosition()) > fallBoundary)
 	{
 		fellFromNarrowIcePath = true;
 		state = State::Crashed;
@@ -305,19 +323,20 @@ float PolarLevel::GetPlayerHorizontalMin() const
 	{
 		return -0.62f;
 	}
-	return terrain == TerrainType::NarrowIcePath ? -1.15f : -1.0f;
+	return terrain == TerrainType::NarrowIcePath ? -1.35f : -1.0f;
 }
 
 float PolarLevel::GetPlayerHorizontalMax() const
 {
 	const TerrainType terrain = GetRoadProfile(traveledDistance).terrain;
-	return terrain == TerrainType::NarrowIcePath ? 1.15f : 1.0f;
+	return terrain == TerrainType::NarrowIcePath ? 1.35f : 1.0f;
 }
 
 const char* PolarLevel::GetObstacleName(ObstacleType type) const
 {
 	if (type == ObstacleType::IceWall) return "ICE WALL";
 	if (type == ObstacleType::BrokenBridge) return "BROKEN BRIDGE";
+	if (type == ObstacleType::Puddle) return "PUDDLE";
 	return "LOW SPIKE";
 }
 
@@ -617,6 +636,24 @@ void PolarLevel::DrawPerspectiveRoad()
 	}
 }
 
+void PolarLevel::DrawNarrowPathWarningSign()
+{
+	constexpr float signCoursePosition = 720.0f;
+	const float distanceToSign = signCoursePosition - traveledDistance;
+	if (distanceToSign < 0.0f || distanceToSign > viewDistance)
+	{
+		return;
+	}
+
+	const int y = DistanceToScreenY(distanceToSign);
+	const int preferredX = GetRoadCenterX(y) + GetRoadHalfWidth(y) + 2;
+	const int x = std::clamp(preferredX, 0, screenWidth - 7);
+	Craft::Renderer::Get().Submit("[!]", Craft::Vector2(x, y - 1),
+		Craft::Color::Yellow, 50);
+	Craft::Renderer::Get().Submit("SLIP", Craft::Vector2(x, y),
+		Craft::Color::Yellow, 50);
+}
+
 void PolarLevel::DrawSnowfieldRow(int y, float depth, const RoadSlice& slice)
 {
 	const int leftX = slice.centerX - slice.halfWidth;
@@ -806,6 +843,19 @@ void PolarLevel::DrawHud()
 		Craft::Color::BrightWhite, 1000);
 	Craft::Renderer::Get().Submit("ARROWS: Glide / Forward / Back   SPACE: Jump   ESC: Menu",
 		Craft::Vector2(1, 1), Craft::Color::Cyan, 1000);
+	if (IsPlaying() && IsOnNarrowIcePath())
+	{
+		constexpr float warningBoundary = 0.90f;
+		const bool nearEdge = player
+			&& std::abs(player->GetHorizontalPosition()) > warningBoundary;
+		const std::string warning = nearEdge
+			? "!!! EDGE WARNING - STEER BACK !!!"
+			: "CAUTION: SLIPPERY NARROW ICE";
+		Craft::Renderer::Get().Submit(warning,
+			Craft::Vector2(screenWidth / 2
+				- static_cast<int>(warning.size()) / 2, 2),
+			nearEdge ? Craft::Color::Red : Craft::Color::Yellow, 1500);
+	}
 
 	if (state == State::Crashed)
 	{
@@ -924,6 +974,7 @@ void PolarLevel::Draw()
 
 	DrawSkyAndHorizon();
 	DrawPerspectiveRoad();
+	DrawNarrowPathWarningSign();
 	Level::Draw();
 	DrawHud();
 	if (state == State::PauseMenu)

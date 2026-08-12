@@ -81,6 +81,12 @@ void PolarObstacle::Draw()
 	{
 		image = closeness > 0.80f ? "^^^^" : (closeness > 0.55f ? "^^" : "^");
 	}
+	else if (obstacleType == ObstacleType::Puddle)
+	{
+		obstacleColor = Craft::Color::Blue;
+		image = closeness > 0.80f ? "~~~~~~~~"
+			: (closeness > 0.55f ? "~~~~" : "~");
+	}
 	else
 	{
 		obstacleColor = Craft::Color::Cyan;
@@ -95,20 +101,27 @@ void PolarObstacle::Draw()
 		{
 			if (visualVariant == 0)
 			{
-				drawCentered("/------\\", -2);
+				drawCentered("/------\\", -5);
+				drawCentered("|######|", -4);
+				drawCentered("|######|", -3);
+				drawCentered("|######|", -2);
 				drawCentered("|######|", -1);
-				image = "|######|";
+				image = "\\______/";
 			}
 			else
 			{
-				drawCentered("/^^^^\\", -2);
+				drawCentered("/^^^^\\", -5);
+				drawCentered("|####|", -4);
+				drawCentered("|####|", -3);
+				drawCentered("|####|", -2);
 				drawCentered("|####|", -1);
 				image = "\\____/";
 			}
 		}
 		else if (closeness > 0.55f)
 		{
-			drawCentered(visualVariant == 0 ? "/---\\" : "/^^\\", -1);
+			drawCentered(visualVariant == 0 ? "/---\\" : "/^^\\", -2);
+			drawCentered(visualVariant == 0 ? "|###|" : "|##|", -1);
 			image = visualVariant == 0 ? "|###|" : "\\__/";
 		}
 		else

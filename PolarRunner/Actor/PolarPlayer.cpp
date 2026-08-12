@@ -28,8 +28,12 @@ void PolarPlayer::Tick(float deltaTime)
 	const float horizontalInput =
 		(input.GetKey(VK_RIGHT) ? 1.0f : 0.0f)
 		- (input.GetKey(VK_LEFT) ? 1.0f : 0.0f);
-	// A little inertia keeps the ice feel without taking control away.
-	const float horizontalResponse = horizontalInput == 0.0f ? 10.0f : 11.0f;
+	// Narrow ice has lower friction: steering builds more slowly and releasing
+	// the key preserves sideways momentum long enough to require correction.
+	const bool isOnNarrowIce = level->IsOnNarrowIcePath();
+	const float horizontalResponse = isOnNarrowIce
+		? (horizontalInput == 0.0f ? 3.5f : 7.0f)
+		: (horizontalInput == 0.0f ? 10.0f : 11.0f);
 	const float horizontalBlend = (std::min)(horizontalResponse * deltaTime, 1.0f);
 	horizontalVelocity += (horizontalInput * horizontalSpeed - horizontalVelocity)
 		* horizontalBlend;

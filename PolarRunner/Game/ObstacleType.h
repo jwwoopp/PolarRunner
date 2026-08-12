@@ -4,5 +4,6 @@ enum class ObstacleType
 {
 	LowSpike,
 	IceWall,
-	BrokenBridge
+	BrokenBridge,
+	Puddle
 };

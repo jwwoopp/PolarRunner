@@ -128,7 +128,7 @@ void PolarPlayer::Draw()
 	}
 	else
 	{
-		Craft::Renderer::Get().Submit(" (o)___", Craft::Vector2(x - 3, y - 1), Craft::Color::BrightWhite, 100);
-		Craft::Renderer::Get().Submit("____<(_____)", Craft::Vector2(x - 6, y), Craft::Color::BrightWhite, 100);
+		Craft::Renderer::Get().Submit(" <(o)___", Craft::Vector2(x - 4, y - 1), Craft::Color::BrightWhite, 100);
+		Craft::Renderer::Get().Submit("____(_____)", Craft::Vector2(x - 6, y), Craft::Color::BrightWhite, 100);
 	}
 }

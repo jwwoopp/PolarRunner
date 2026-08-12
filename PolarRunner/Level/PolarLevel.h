@@ -79,13 +79,11 @@ private:
 	
 	// 추가
 	void HandleMenuInput();
-	void DrawStartMenu();
 	void DrawPauseMenu();
 	void RetryGame();
 
 	enum class State
 	{
-		StartMenu,
 		Playing,
 		PauseMenu,
 		Crashed,
@@ -116,7 +114,7 @@ private:
 	float speedNotificationTimer = 0.0f;
 	int speedNotificationStage = 0;
 	std::string speedNotification;
-	State state = State::StartMenu;
+	State state = State::Playing;
 	State stateBeforePause = State::Playing;
 	MenuItem selectedMenuItem = MenuItem::Resume;
 	ObstacleType crashedObstacleType = ObstacleType::LowSpike;

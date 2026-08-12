@@ -187,9 +187,23 @@ void PolarLevel::CheckObstacleCollisions()
 		// projected screen X values made nearby rows diverge on curved roads.
 		const float combinedHalfWidth = player->GetHorizontalHalfWidth()
 			+ obstacle->GetHorizontalHalfWidth();
-		const bool horizontalOverlap =
+		const bool normalizedHorizontalOverlap =
 			std::abs(player->GetHorizontalPosition()
-				- obstacle->GetHorizontalPosition()) < combinedHalfWidth;
+				- obstacle->GetHorizontalPosition()) <= combinedHalfWidth;
+		// Near the collision row, LowSpike is drawn as "^^^^". Match that visible
+		// width against the sliding penguin's central body instead of estimating
+		// the contact only with normalized road coordinates.
+		const int playerCollisionX = GetRoadScreenX(
+			player->GetHorizontalPosition(), currentPlayerScreenY);
+		const int obstacleCollisionX = GetRoadScreenX(
+			obstacle->GetHorizontalPosition(), currentPlayerScreenY);
+		const bool spikeScreenOverlap =
+			playerCollisionX - 2 <= obstacleCollisionX + 1
+			&& playerCollisionX + 4 >= obstacleCollisionX - 2;
+		const bool horizontalOverlap =
+			obstacle->GetObstacleType() == ObstacleType::LowSpike
+			? spikeScreenOverlap
+			: normalizedHorizontalOverlap;
 		// Collision occurs only when the projected obstacle crosses the penguin's
 		// foot row from above. The swept row test also works at high run speeds.
 		const bool crossedPlayerRow =

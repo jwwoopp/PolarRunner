@@ -24,7 +24,9 @@ public:
 
 private:
 	float horizontalPosition = 0.0f;
-	float horizontalHalfWidth = 0.10f;
+	// Covers the sliding penguin's central body, including the right-side ')'.
+	// The long ASCII trail on the left remains visual-only for fair near misses.
+	float horizontalHalfWidth = 0.13f;
 	float horizontalVelocity = 0.0f;
 	float horizontalSpeed = 1.8f;
 	float longitudinalScreenOffset = 0.0f;

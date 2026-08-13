@@ -26,6 +26,9 @@
     <ClCompile Include="Level\PolarLevel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Level\PolarLevel_Draw.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="Level\TitleLevel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

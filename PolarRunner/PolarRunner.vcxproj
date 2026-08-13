@@ -98,8 +98,8 @@
     <ClCompile Include="Actor\Player.cpp" />
     <ClCompile Include="Actor\PolarStar.cpp" />
     <ClCompile Include="Actor\Enemy.cpp" />
+    <ClCompile Include="Level\MenuLevel.cpp" />
     <ClCompile Include="Level\PolarLevel.cpp" />
-    <ClCompile Include="Level\PolarLevel_Draw.cpp" />
     <ClCompile Include="Level\TestLevel.cpp" />
     <ClCompile Include="Level\TitleLevel.cpp" />
     <ClCompile Include="Main.cpp" />
@@ -112,6 +112,7 @@
     <ClInclude Include="Actor\PolarStar.h" />
     <ClInclude Include="Actor\Enemy.h" />
     <ClInclude Include="Game\ObstacleType.h" />
+    <ClInclude Include="Level\MenuLevel.h" />
     <ClInclude Include="Level\PolarLevel.h" />
     <ClInclude Include="Level\TestLevel.h" />
     <ClInclude Include="Level\TitleLevel.h" />

@@ -3,6 +3,7 @@
 #include <Core/Core.h>
 #include <memory>		// 스마트 포인터 사용을 위해.
 #include <string>
+#include <utility>
 #include <vector>
 #include <unordered_map>
 
@@ -87,6 +88,31 @@ namespace Craft
 			nextLevel = std::make_shared<T>();
 		}
 
+		// 메인 레벨과 별개로 겹쳐서 띄우는(오버레이) 보조 레벨 생성 함수.
+		// 예) 일시정지 메뉴처럼 메인 레벨 상태를 유지한 채 보여줘야 하는 화면.
+		template<typename T, typename ...Args,
+			typename = std::enable_if_t<std::is_base_of<Level, T>::value>>
+			void SetSecondaryLevel(Args&& ...args)
+		{
+			secondaryLevel = std::make_shared<T>(std::forward<Args>(args)...);
+		}
+
+		// 보조 레벨을 새로 만들지 않고 표시 여부만 켜고 끄는 함수.
+		// (보조 레벨이 켜져 있으면 메인 레벨은 Tick이 멈추고 Draw만 계속되어
+		// 배경으로 남는다.)
+		inline void SetSecondaryLevelActive(bool active)
+		{
+			secondaryLevelActive = active;
+		}
+		inline bool IsSecondaryLevelActive() const
+		{
+			return secondaryLevelActive;
+		}
+		inline std::shared_ptr<Level> GetSecondaryLevel() const
+		{
+			return secondaryLevel;
+		}
+
 		// 전역 접근 함수.
 		static Engine& Get();
 
@@ -139,6 +165,10 @@ namespace Craft
 
 		// 추가 요청된 레벨.
 		std::shared_ptr<Level> nextLevel;
+
+		// 메인 레벨 위에 겹쳐 띄우는 보조 레벨과 표시 여부.
+		std::shared_ptr<Level> secondaryLevel;
+		bool secondaryLevelActive = false;
 
 		// 입력 시스템 변수.
 		std::unique_ptr<Input> input;

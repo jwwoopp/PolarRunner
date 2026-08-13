@@ -2,6 +2,7 @@
 
 #include <Game/ObstacleType.h>
 #include <Level/Level.h>
+#include <Level/MenuLevel.h>
 #include <Actor/EnemyBullet.h>
 #include <functional>
 #include <string>
@@ -101,25 +102,16 @@ private:
 	
 	// 추가
 	void HandleMenuInput();
-	void DrawPauseMenu();
+	void OpenMenu(bool canResume, MenuLevel::Item defaultItem);
 	void RetryGame();
 
 	enum class State
 	{
 		Playing,
-		PauseMenu,
 		Crashed,
 		Goal
 	};
 
-	enum class MenuItem
-	{
-		Resume,
-		Retry,
-		Quit,
-		Length
-	};
-	
 	const char* GetObstacleName(ObstacleType type) const;
 	const char* GetCurveDirection() const;
 
@@ -140,8 +132,6 @@ private:
 	static constexpr int RequiredStarCount = 5;
 	std::string speedNotification;
 	State state = State::Playing;
-	State stateBeforePause = State::Playing;
-	MenuItem selectedMenuItem = MenuItem::Resume;
 	ObstacleType crashedObstacleType = ObstacleType::LowSpike;
 	bool fellFromNarrowIcePath = false;
 	bool fellThroughBrokenBridge = false;

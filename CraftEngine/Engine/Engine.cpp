@@ -137,6 +137,12 @@ namespace Craft
 					mainLevel->SavePreviousActorStates();
 				}
 
+				if (secondaryLevel)
+				{
+					secondaryLevel->ProcessAddAndDestroyActors();
+					secondaryLevel->SavePreviousActorStates();
+				}
+
 				// 입력 상태 저장.
 				SavePreviousInputStates();
 
@@ -178,28 +184,41 @@ namespace Craft
 	void Engine::OnInitialized()
 	{
 		// 레벨 초기화 처리.
-		// 예외 처리.
-		if (!mainLevel || mainLevel->HasInitialized())
+		if (mainLevel && !mainLevel->HasInitialized())
 		{
-			return;
+			// 초기화 이벤트 호출.
+			mainLevel->OnInitialized();
 		}
 
-		// 초기화 이벤트 호출.
-		mainLevel->OnInitialized();
+		if (secondaryLevel && !secondaryLevel->HasInitialized())
+		{
+			secondaryLevel->OnInitialized();
+		}
 	}
 
 	void Engine::BeginPlay()
 	{
-		if (!mainLevel)
+		if (mainLevel)
 		{
-			return;
+			// 레벨에 이벤트 전달.
+			mainLevel->BeginPlay();
 		}
 
-		// 레벨에 이벤트 전달.
-		mainLevel->BeginPlay();
+		if (secondaryLevel)
+		{
+			secondaryLevel->BeginPlay();
+		}
 	}
 	void Engine::Tick(float deltaTime)
 	{
+		// 보조 레벨이 켜져 있는 동안에는 메인 레벨의 Tick(게임플레이 갱신)을
+		// 멈춘다. 예) 일시정지 메뉴가 떠 있을 때 게임 상태는 그대로 유지.
+		if (secondaryLevelActive && secondaryLevel)
+		{
+			secondaryLevel->Tick(deltaTime);
+			return;
+		}
+
 		if (!mainLevel)
 		{
 			return;
@@ -212,13 +231,16 @@ namespace Craft
 
 	void Engine::Draw()
 	{
-		if (!mainLevel)
+		if (mainLevel)
 		{
-			return;
+			// 메인 레벨은 보조 레벨이 켜져 있어도 배경으로 계속 그린다.
+			mainLevel->Draw();
 		}
 
-		// 레벨에 이벤트 전달.
-		mainLevel->Draw();
+		if (secondaryLevelActive && secondaryLevel)
+		{
+			secondaryLevel->Draw();
+		}
 
 		// 렌더러에 Draw 이벤트 호출.
 		if (!renderer)

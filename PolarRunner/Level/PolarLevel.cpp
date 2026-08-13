@@ -72,7 +72,33 @@ void PolarLevel::BuildRoadCourse()
 		// 북극 도착 구간
 		{ 900.0f,  0.00f, 1.10f, TerrainType::Snowfield },
 		{ 950.0f, -0.35f, 1.20f, TerrainType::Snowfield },
-		{ 1000.0f, 0.00f, 1.35f, TerrainType::Snowfield }
+		{ 1000.0f, 0.00f, 1.35f, TerrainType::Snowfield },
+
+		// 후반 진입: 넓은 설원에서 속도에 적응합니다.
+		{ 1080.0f, 0.35f, 1.25f, TerrainType::Snowfield },
+
+		// 두 번째 밀렵선이 등장하는 해안 구간입니다.
+		{ 1120.0f, 0.10f, 1.10f, TerrainType::Coast },
+		{ 1190.0f, -0.50f, 0.95f, TerrainType::Coast },
+		{ 1260.0f, 0.45f, 1.05f, TerrainType::Coast },
+
+		// 빠른 연속 조향을 요구하는 협곡과 연구기지입니다.
+		{ 1320.0f, 0.55f, 0.62f, TerrainType::Canyon },
+		{ 1390.0f, -0.55f, 0.58f, TerrainType::Canyon },
+		{ 1460.0f, 0.45f, 0.92f, TerrainType::ResearchBase },
+		{ 1540.0f, -0.45f, 0.88f, TerrainType::ResearchBase },
+
+		// 세 번째 밀렵선이 등장하는 마지막 해안 구간입니다.
+		{ 1630.0f, 0.00f, 1.15f, TerrainType::Coast },
+		{ 1700.0f, 0.50f, 1.00f, TerrainType::Coast },
+		{ 1770.0f, -0.45f, 0.95f, TerrainType::Coast },
+
+		// 결승 전에는 다리 점프와 좁은 길 조향을 다시 확인합니다.
+		{ 1810.0f, 0.00f, 0.85f, TerrainType::BrokenIce },
+		{ 1870.0f, 0.30f, 0.48f, TerrainType::NarrowIcePath },
+		{ 1930.0f, -0.30f, 0.52f, TerrainType::NarrowIcePath },
+		{ 1970.0f, 0.00f, 1.20f, TerrainType::Snowfield },
+		{ 2000.0f, 0.00f, 1.35f, TerrainType::Snowfield }
 	};
 }
 
@@ -267,11 +293,36 @@ void PolarLevel::BuildTestCourse()
 			spawnObstacle(lane, distance, type);
 		}
 	}
+
+	// 후반부는 속도가 높으므로 장애물 간격을 급격히 줄이지 않습니다.
+	// 한 거리에는 하나만 배치해 항상 좌우 회피 공간을 남깁니다.
+	for (float distance = 1040.0f; distance < 1810.0f;)
+	{
+		const bool isEnemyCombatSection =
+			(distance >= 1120.0f && distance <= 1260.0f)
+			|| (distance >= 1630.0f && distance <= 1770.0f);
+		if (!isEnemyCombatSection)
+		{
+			const auto [lane, type] = randomObstacle();
+			spawnObstacle(lane, distance, type);
+		}
+		distance += distance < 1450.0f
+			? randomSpacing(42.0f, 58.0f)
+			: randomSpacing(34.0f, 48.0f);
+	}
+
+	// 결승 전에는 점프, 안전 레인 선택, 점프 순서로 마무리합니다.
+	brokenBridge(1835.0f + bridgeJitter(random));
+	doubleWall(laneChoice(random), 1905.0f + patternJitter(random));
+	spike(lanes[laneChoice(random)], 1960.0f + patternJitter(random));
+
 	// Obstacles are finalized before collectibles. Each star then selects a lane
 	// with enough same-lane clearance; obstacles in other lanes remain allowed.
 	const float starDistances[] =
 	{
-		90.0f, 195.0f, 315.0f, 450.0f, 575.0f, 750.0f, 890.0f
+		90.0f, 195.0f, 315.0f, 450.0f, 575.0f, 750.0f, 890.0f,
+		1060.0f, 1160.0f, 1285.0f, 1415.0f, 1570.0f, 1660.0f,
+		1785.0f, 1880.0f, 1975.0f
 	};
 	constexpr float starObstacleSpacing = 20.0f;
 	for (float starDistance : starDistances)
@@ -338,8 +389,26 @@ void PolarLevel::Tick(float deltaTime)
 void PolarLevel::UpdateCoastEnemy(float deltaTime)
 {
 	const TerrainType terrain = GetRoadProfile(traveledDistance).terrain;
-	if (!hasSpawnedCoastEnemy && terrain == TerrainType::Coast
-		&& nonShotCount > 0)
+	constexpr float enemyZoneStarts[] = { 1120.0f, 1630.0f };
+	constexpr float enemyZoneEnds[] = { 1260.0f, 1770.0f };
+	constexpr int enemyZoneCount = 2;
+
+	// SHOT이 없는 채 구간을 통과했다면 다음 해안 구간을 기다립니다.
+	while (nextCoastEnemyZoneIndex < enemyZoneCount
+		&& traveledDistance > enemyZoneEnds[nextCoastEnemyZoneIndex])
+	{
+		++nextCoastEnemyZoneIndex;
+		coastEnemyWarningTimer = 0.0f;
+	}
+
+	const bool hasActiveEnemy = coastEnemy && !coastEnemy->HasExpired();
+	const bool isInsideNextEnemyZone =
+		nextCoastEnemyZoneIndex < enemyZoneCount
+		&& traveledDistance >= enemyZoneStarts[nextCoastEnemyZoneIndex]
+		&& traveledDistance <= enemyZoneEnds[nextCoastEnemyZoneIndex];
+
+	if (!hasActiveEnemy && isInsideNextEnemyZone
+		&& terrain == TerrainType::Coast && nonShotCount > 0)
 	{
 		coastEnemyWarningTimer += deltaTime;
 		constexpr float warningDuration = 2.0f;
@@ -348,11 +417,11 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 			constexpr float initialDistance = 95.0f;
 			coastEnemy = SpawnActor<Enemy>(initialDistance, EnemySide::Left);
 			coastEnemyScreenX = screenWidth * 0.18f;
-			hasSpawnedCoastEnemy = true;
+			++nextCoastEnemyZoneIndex;
 			coastEnemyWarningTimer = 0.0f;
 		}
 	}
-	else if (!hasSpawnedCoastEnemy)
+	else if (!hasActiveEnemy)
 	{
 		coastEnemyWarningTimer = 0.0f;
 	}
@@ -403,7 +472,8 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 	}
 
 	const int screenX = static_cast<int>(coastEnemyScreenX);
-	coastEnemy->SetPosition(Craft::Vector2(screenX, screenY));
+	// screenX는 밀렵꾼 중앙이며 Actor 충돌 위치는 7칸 몸통의 왼쪽 끝입니다.
+	coastEnemy->SetPosition(Craft::Vector2(screenX - 3, screenY));
 
 	// Enemy가 접근을 마치고 펭귄이 달리는 지면 근처까지 내려온 뒤 사격합니다.
 	// Chasing은 X축 접근이 끝나 사격 위치에 도달했다는 뜻입니다.
@@ -1242,7 +1312,7 @@ void PolarLevel::DrawHud()
 				- static_cast<int>(ready.size()) / 2, 2),
 			Craft::Color::Green, 1600);
 	}
-	if (!hasSpawnedCoastEnemy && coastEnemyWarningTimer > 0.0f)
+	if (coastEnemyWarningTimer > 0.0f)
 	{
 		const std::string warning = "ENEMY SHIP APPROACHING!";
 		Craft::Renderer::Get().Submit(warning,

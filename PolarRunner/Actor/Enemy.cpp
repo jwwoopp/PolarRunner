@@ -4,12 +4,12 @@
 
 
 Enemy::Enemy(const Craft::Vector2& position)
-	: Actor("[_O_]==>", position, Craft::Color::Red)
+	: Actor("_______", position, Craft::Color::Red)
 {
 }
 
 Enemy::Enemy(float distance, EnemySide side)
-	: Actor("<P>", Craft::Vector2::Zero, Craft::Color::Red),
+	: Actor("_______", Craft::Vector2::Zero, Craft::Color::Red),
 	distance(distance),
 	side(side)
 {
@@ -35,19 +35,18 @@ void Enemy::Advance(float amount, float chaseDistance)
 void Enemy::Draw()
 {
 	const Craft::Vector2 targetPosition = GetPosition();
-	const int x = targetPosition.x;
+	// Actor 위치는 7칸 피격 영역의 왼쪽 끝이고, Draw는 중앙을 기준으로 합니다.
+	const int x = targetPosition.x + 3;
 	const int y = targetPosition.y;
 
 	if (distance > 55.0f)
 	{
-		ChangeImage("<P>");
 		Craft::Renderer::Get().Submit("|>", Craft::Vector2(x, y),
 			Craft::Color::Red, 120);
 		return;
 	}
 
 	// 접근이 끝난 뒤에도 화면을 가리지 않도록 중간 크기를 유지합니다.
-	ChangeImage("[P]");
 	Craft::Renderer::Get().Submit("|+----+", Craft::Vector2(x - 5, y - 3),
 		Craft::Color::Red, 120);
 	Craft::Renderer::Get().Submit("|| !  |", Craft::Vector2(x - 5, y - 2),

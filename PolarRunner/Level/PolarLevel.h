@@ -115,7 +115,7 @@ private:
 	int playerScreenY = 24;
 	float viewDistance = 100.0f;
 	float runSpeed = 16.0f;
-	float courseDistance = 1000.0f;
+	float courseDistance = 2000.0f;
 	float traveledDistance = 0.0f;
 	float curveStrength = 0.0f;
 	float speedNotificationTimer = 0.0f;
@@ -138,7 +138,7 @@ private:
 	std::vector<std::shared_ptr<PolarStar>> stars;
 	std::vector<std::shared_ptr<EnemyBullet>> enemyBullets;
 	std::shared_ptr<Enemy> coastEnemy;
-	bool hasSpawnedCoastEnemy = false;
+	int nextCoastEnemyZoneIndex = 0;
 	float coastEnemyWarningTimer = 0.0f;
 	float enemyFireTimer = 0.0f;
 	float coastEnemyScreenX = 0.0f;

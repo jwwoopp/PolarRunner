@@ -1121,55 +1121,36 @@ void PolarLevel::DrawNarrowPathWarningSign()
 
 void PolarLevel::DrawSnowfieldRow(int y, float depth, const RoadSlice& slice)
 {
-	const int leftX = slice.centerX - slice.halfWidth;
-	const int rightX = slice.centerX + slice.halfWidth;
-	DrawSnowSurface(y, 0, leftX - 1);
-	DrawSnowSurface(y, rightX + 1, screenWidth - 1);
-	Craft::Renderer::Get().Submit(depth > 0.55f ? "/" : "|",
-		Craft::Vector2(leftX, y), Craft::Color::BrightWhite, 0);
-	Craft::Renderer::Get().Submit(depth > 0.55f ? "\\" : "|",
-		Craft::Vector2(rightX, y), Craft::Color::BrightWhite, 0);
+	DrawRoadEdges(y, slice, &PolarLevel::DrawSnowSurface, &PolarLevel::DrawSnowSurface,
+		depth, 0.55f, "|", "/", "|", "\\",
+		Craft::Color::BrightWhite, Craft::Color::BrightWhite);
 }
 
 void PolarLevel::DrawCoastRow(int y, float depth, const RoadSlice& slice)
 {
-	const int leftX = slice.centerX - slice.halfWidth;
-	const int rightX = slice.centerX + slice.halfWidth;
-	DrawOcean(y, 0, leftX - 1);
-	DrawSnowSurface(y, rightX + 1, screenWidth - 1);
-	Craft::Renderer::Get().Submit(depth > 0.45f ? "~" : ":",
-		Craft::Vector2(leftX, y), Craft::Color::Blue, 0);
-	Craft::Renderer::Get().Submit("\\", Craft::Vector2(rightX, y),
-		Craft::Color::BrightWhite, 0);
+	DrawRoadEdges(y, slice, &PolarLevel::DrawOcean, &PolarLevel::DrawSnowSurface,
+		depth, 0.45f, ":", "~", "\\", "\\",
+		Craft::Color::Blue, Craft::Color::BrightWhite);
 }
 
 void PolarLevel::DrawCanyonRow(int y, float depth, const RoadSlice& slice)
 {
-	const int leftX = slice.centerX - slice.halfWidth;
-	const int rightX = slice.centerX + slice.halfWidth;
-	DrawCanyonWall(y, 0, leftX - 1);
-	DrawCanyonWall(y, rightX + 1, screenWidth - 1);
-	const char* wallEdge = depth > 0.5f ? "#" : "|";
-	Craft::Renderer::Get().Submit(wallEdge, Craft::Vector2(leftX, y),
-		Craft::Color::Cyan, 0);
-	Craft::Renderer::Get().Submit(wallEdge, Craft::Vector2(rightX, y),
-		Craft::Color::Cyan, 0);
+	DrawRoadEdges(y, slice, &PolarLevel::DrawCanyonWall, &PolarLevel::DrawCanyonWall,
+		depth, 0.5f, "|", "#", "|", "#",
+		Craft::Color::Cyan, Craft::Color::Cyan);
 }
 
 void PolarLevel::DrawNarrowIcePathRow(int y, float depth, const RoadSlice& slice)
 {
-	const int leftX = slice.centerX - slice.halfWidth;
-	const int rightX = slice.centerX + slice.halfWidth;
-	DrawOcean(y, 0, leftX - 1);
-	DrawOcean(y, rightX + 1, screenWidth - 1);
-
 	// Perspective rails make the strip read as a bridge rather than a tunnel.
-	Craft::Renderer::Get().Submit("/", Craft::Vector2(leftX, y),
-		Craft::Color::BrightWhite, 1);
-	Craft::Renderer::Get().Submit("\\", Craft::Vector2(rightX, y),
-		Craft::Color::BrightWhite, 1);
+	DrawRoadEdges(y, slice, &PolarLevel::DrawOcean, &PolarLevel::DrawOcean,
+		depth, 0.5f, "/", "/", "\\", "\\",
+		Craft::Color::BrightWhite, Craft::Color::BrightWhite, 1);
 
 	// Keep the intact ice quiet so the dense blue gap is immediately readable.
+	// (일반 Draw*Row 골격과 다른, 이 지형만의 얼음 격자 스티플이라 따로 그립니다.)
+	const int leftX = slice.centerX - slice.halfWidth;
+	const int rightX = slice.centerX + slice.halfWidth;
 	for (int x = leftX + 1; x < rightX; ++x)
 	{
 		if ((x + y) % (depth > 0.55f ? 4 : 6) == 0)
@@ -1183,106 +1164,99 @@ void PolarLevel::DrawNarrowIcePathRow(int y, float depth, const RoadSlice& slice
 
 void PolarLevel::DrawBrokenIceRow(int y, float depth, const RoadSlice& slice)
 {
+	DrawRoadEdges(y, slice, &PolarLevel::DrawOcean, &PolarLevel::DrawOcean,
+		depth, 0.5f, "|", "/", "|", "\\",
+		Craft::Color::Cyan, Craft::Color::Cyan);
+	// 도로 안쪽 깨진 빙판은 공용 골격에 없는 이 지형만의 내부 채우기입니다.
 	const int leftX = slice.centerX - slice.halfWidth;
 	const int rightX = slice.centerX + slice.halfWidth;
-	DrawOcean(y, 0, leftX - 1);
-	DrawOcean(y, rightX + 1, screenWidth - 1);
 	DrawBrokenIce(y, leftX + 1, rightX - 1);
-	Craft::Renderer::Get().Submit(depth > 0.5f ? "/" : "|",
-		Craft::Vector2(leftX, y), Craft::Color::Cyan, 0);
-	Craft::Renderer::Get().Submit(depth > 0.5f ? "\\" : "|",
-		Craft::Vector2(rightX, y), Craft::Color::Cyan, 0);
 }
 
 void PolarLevel::DrawResearchBaseRow(int y, float depth, const RoadSlice& slice)
 {
+	DrawRoadEdges(y, slice, &PolarLevel::DrawResearchBase, &PolarLevel::DrawResearchBase,
+		depth, 0.45f, "|", "[", "|", "]",
+		Craft::Color::BrightWhite, Craft::Color::BrightWhite);
+}
+
+void PolarLevel::DrawRoadEdges(int y, const RoadSlice& slice,
+	void (PolarLevel::*leftFill)(int, int, int),
+	void (PolarLevel::*rightFill)(int, int, int),
+	float depth, float edgeDepthThreshold,
+	const char* leftGlyphNear, const char* leftGlyphFar,
+	const char* rightGlyphNear, const char* rightGlyphFar,
+	Craft::Color leftColor, Craft::Color rightColor,
+	int sortingOrder)
+{
 	const int leftX = slice.centerX - slice.halfWidth;
 	const int rightX = slice.centerX + slice.halfWidth;
-	DrawResearchBase(y, 0, leftX - 1);
-	DrawResearchBase(y, rightX + 1, screenWidth - 1);
-	const char* leftEdge = depth > 0.45f ? "[" : "|";
-	const char* rightEdge = depth > 0.45f ? "]" : "|";
-	Craft::Renderer::Get().Submit(leftEdge, Craft::Vector2(leftX, y),
-		Craft::Color::BrightWhite, 0);
-	Craft::Renderer::Get().Submit(rightEdge, Craft::Vector2(rightX, y),
-		Craft::Color::BrightWhite, 0);
+	(this->*leftFill)(y, 0, leftX - 1);
+	(this->*rightFill)(y, rightX + 1, screenWidth - 1);
+	const char* leftGlyph = depth > edgeDepthThreshold ? leftGlyphFar : leftGlyphNear;
+	const char* rightGlyph = depth > edgeDepthThreshold ? rightGlyphFar : rightGlyphNear;
+	Craft::Renderer::Get().Submit(leftGlyph, Craft::Vector2(leftX, y),
+		leftColor, sortingOrder);
+	Craft::Renderer::Get().Submit(rightGlyph, Craft::Vector2(rightX, y),
+		rightColor, sortingOrder);
 }
 
 void PolarLevel::DrawCanyonWall(int y, int startX, int endX)
 {
-	startX = std::clamp(startX, 0, screenWidth - 1);
-	endX = std::clamp(endX, 0, screenWidth - 1);
-	for (int x = startX; x <= endX; ++x)
-	{
-		if ((x + y) % 2 == 0)
-		{
-			const char* glyph = (x + y) % 6 == 0 ? "#" : ".";
-			Craft::Renderer::Get().Submit(glyph, Craft::Vector2(x, y),
-				Craft::Color::Cyan, 0);
-		}
-	}
+	DrawTerrainFill(y, startX, endX, Craft::Color::Cyan,
+		[](int px, int py, float) { return (px + py) % 2 == 0; },
+		[](int px, int py) { return (px + py) % 6 == 0 ? "#" : "."; });
 }
 
 void PolarLevel::DrawSnowSurface(int y, int startX, int endX)
 {
-	startX = std::clamp(startX, 0, screenWidth - 1);
-	endX = std::clamp(endX, 0, screenWidth - 1);
-	for (int x = startX; x <= endX; ++x)
-	{
-		if ((x + y * 2) % 5 == 0)
-		{
-			const char* glyph = (x + y) % 10 == 0 ? "*" : ".";
-			Craft::Renderer::Get().Submit(glyph, Craft::Vector2(x, y),
-				Craft::Color::BrightWhite, 0);
-		}
-	}
+	DrawTerrainFill(y, startX, endX, Craft::Color::BrightWhite,
+		[](int px, int py, float) { return (px + py * 2) % 5 == 0; },
+		[](int px, int py) { return (px + py) % 10 == 0 ? "*" : "."; });
 }
 
 void PolarLevel::DrawOcean(int y, int startX, int endX)
 {
-	startX = std::clamp(startX, 0, screenWidth - 1);
-	endX = std::clamp(endX, 0, screenWidth - 1);
-	for (int x = startX; x <= endX; ++x)
-	{
-		if ((x + y) % 3 == 0)
-		{
-			const char* glyph = (x + y) % 6 == 0 ? "~" : "-";
-			Craft::Renderer::Get().Submit(glyph, Craft::Vector2(x, y),
-				Craft::Color::Blue, 0);
-		}
-	}
+	DrawTerrainFill(y, startX, endX, Craft::Color::Blue,
+		[](int px, int py, float) { return (px + py) % 3 == 0; },
+		[](int px, int py) { return (px + py) % 6 == 0 ? "~" : "-"; });
 }
 
 void PolarLevel::DrawBrokenIce(int y, int startX, int endX)
 {
-	startX = std::clamp(startX, 0, screenWidth - 1);
-	endX = std::clamp(endX, 0, screenWidth - 1);
-	const float depth = ScreenYToRoadDepth(y);
-	const int spacing = 17 - static_cast<int>(depth * 9.0f);
-	for (int x = startX; x <= endX; ++x)
-	{
-		if ((x * 3 + y * 5) % spacing == 0)
+	DrawTerrainFill(y, startX, endX, Craft::Color::Cyan,
+		[](int px, int py, float depth)
 		{
-			const char* glyph = (x + y) % 2 == 0 ? "/" : "\\";
-			Craft::Renderer::Get().Submit(glyph, Craft::Vector2(x, y),
-				Craft::Color::Cyan, 0);
-		}
-	}
+			const int spacing = 17 - static_cast<int>(depth * 9.0f);
+			return (px * 3 + py * 5) % spacing == 0;
+		},
+		[](int px, int py) { return (px + py) % 2 == 0 ? "/" : "\\"; });
 }
 
 void PolarLevel::DrawResearchBase(int y, int startX, int endX)
 {
+	DrawTerrainFill(y, startX, endX, Craft::Color::BrightWhite,
+		[](int px, int py, float depth)
+		{
+			const int spacing = 10 - static_cast<int>(depth * 5.0f);
+			return (px + py * 2) % spacing == 0;
+		},
+		[](int px, int py) { return (py % 4 == 0) ? "#" : ((px % 5 == 0) ? "|" : "_"); });
+}
+
+void PolarLevel::DrawTerrainFill(int y, int startX, int endX, Craft::Color color,
+	const std::function<bool(int, int, float)>& shouldDraw,
+	const std::function<const char*(int, int)>& glyphFor)
+{
 	startX = std::clamp(startX, 0, screenWidth - 1);
 	endX = std::clamp(endX, 0, screenWidth - 1);
 	const float depth = ScreenYToRoadDepth(y);
-	const int spacing = 10 - static_cast<int>(depth * 5.0f);
 	for (int x = startX; x <= endX; ++x)
 	{
-		if ((x + y * 2) % spacing == 0)
+		if (shouldDraw(x, y, depth))
 		{
-			const char* glyph = (y % 4 == 0) ? "#" : ((x % 5 == 0) ? "|" : "_");
-			Craft::Renderer::Get().Submit(glyph, Craft::Vector2(x, y),
-				Craft::Color::BrightWhite, 0);
+			Craft::Renderer::Get().Submit(glyphFor(x, y), Craft::Vector2(x, y),
+				color, 0);
 		}
 	}
 }

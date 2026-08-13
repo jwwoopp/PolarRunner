@@ -3,6 +3,7 @@
 #include <Game/ObstacleType.h>
 #include <Level/Level.h>
 #include <Actor/EnemyBullet.h>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -73,11 +74,25 @@ private:
 	void DrawNarrowIcePathRow(int y, float depth, const RoadSlice& slice);
 	void DrawBrokenIceRow(int y, float depth, const RoadSlice& slice);
 	void DrawResearchBaseRow(int y, float depth, const RoadSlice& slice);
+	// leftFill/rightFill로 도로 좌/우 배경을 채우고, depth 기준으로 가장자리
+	// 글자를 고르는 6개 Draw*Row 함수의 공용 골격.
+	void DrawRoadEdges(int y, const RoadSlice& slice,
+		void (PolarLevel::*leftFill)(int, int, int),
+		void (PolarLevel::*rightFill)(int, int, int),
+		float depth, float edgeDepthThreshold,
+		const char* leftGlyphNear, const char* leftGlyphFar,
+		const char* rightGlyphNear, const char* rightGlyphFar,
+		Craft::Color leftColor, Craft::Color rightColor,
+		int sortingOrder = 0);
 	void DrawSnowSurface(int y, int startX, int endX);
 	void DrawOcean(int y, int startX, int endX);
 	void DrawCanyonWall(int y, int startX, int endX);
 	void DrawBrokenIce(int y, int startX, int endX);
 	void DrawResearchBase(int y, int startX, int endX);
+	// 배경 채우기 함수들이 공유하는 "칸마다 조건 검사 후 glyph 선택" 골격.
+	void DrawTerrainFill(int y, int startX, int endX, Craft::Color color,
+		const std::function<bool(int x, int y, float depth)>& shouldDraw,
+		const std::function<const char*(int x, int y)>& glyphFor);
 	void DrawHud();
 	float GetDisplayDistanceMeters() const;
 	void UpdateRunSpeed(float deltaTime);

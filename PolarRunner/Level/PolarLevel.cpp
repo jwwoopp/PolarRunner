@@ -312,8 +312,10 @@ void PolarLevel::BuildTestCourse()
 	}
 
 	// 결승 전에는 점프, 안전 레인 선택, 점프 순서로 마무리합니다.
+	// 1870~1930m는 도로 폭이 가장 좁은 NarrowIcePath 구간이라 doubleWall(2/3 차단)
+	// 대신 단일 IceWall만 배치해 좁은 도로와 겹쳐 난이도가 튀지 않게 합니다.
 	brokenBridge(1835.0f + bridgeJitter(random));
-	doubleWall(laneChoice(random), 1905.0f + patternJitter(random));
+	wall(lanes[laneChoice(random)], 1905.0f + patternJitter(random));
 	spike(lanes[laneChoice(random)], 1960.0f + patternJitter(random));
 
 	// Obstacles are finalized before collectibles. Each star then selects a lane

@@ -664,7 +664,15 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 		// 느린 예고탄, 한 번의 빠른 후속탄, 긴 휴식이 반복됩니다.
 		constexpr float fireIntervals[] = { 2.5f, 1.4f, 3.0f };
 		constexpr int firePatternCount = 3;
-		const float fireInterval = fireIntervals[enemyFirePatternIndex];
+		// UpdateRunSpeed와 같은 방식으로 코스 진행률에 따라 발사 간격을
+		// 점점 줄여, 뒤쪽 해안 구간일수록 더 자주(연사에 가깝게) 쏘게 합니다.
+		constexpr float minIntervalScale = 0.4f;
+		const float courseProgress = std::clamp(
+			traveledDistance / courseDistance, 0.0f, 1.0f);
+		const float intervalScale =
+			1.0f - courseProgress * (1.0f - minIntervalScale);
+		const float fireInterval =
+			fireIntervals[enemyFirePatternIndex] * intervalScale;
 		if (enemyFireTimer >= fireInterval)
 		{
 			const Craft::Vector2 enemyPosition = coastEnemy->GetPosition();

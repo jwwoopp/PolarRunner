@@ -34,21 +34,24 @@ ScreenBounds PolarObstacle::GetIceWallScreenBounds() const
 
 	// Draw()의 근접 단계(closeness 기준)와 같은 폭을 쓰되, 위로 갈수록
 	// 좁아지는 지붕 행은 제외하고 일정 폭으로 그려지는 몸통 행만 씁니다.
-	int halfWidth = 1;
+	int bodyWidth = visualVariant == 0 ? 2 : 3;
 	int bodyRowSpan = 0;
 	if (closeness > 0.72f)
 	{
-		halfWidth = 4;
+		bodyWidth = 8;
 		bodyRowSpan = 2;
 	}
 	else if (closeness > 0.30f)
 	{
-		halfWidth = 3;
+		bodyWidth = 6;
 		bodyRowSpan = 1;
 	}
 
-	bounds.left = x - halfWidth;
-	bounds.right = x + halfWidth;
+	// Draw()는 x - row.size() / 2에서 문자열을 시작합니다. 짝수 너비를
+	// x +/- halfWidth로 계산하면 실제 출력보다 오른쪽이 한 칸 더 넓어져
+	// 보이지 않는 충돌 칸이 생기므로 문자열 길이 그대로 끝 좌표를 구합니다.
+	bounds.left = x - bodyWidth / 2;
+	bounds.right = bounds.left + bodyWidth - 1;
 	bounds.top = y - bodyRowSpan;
 	bounds.bottom = y;
 	return bounds;

@@ -126,7 +126,7 @@ private:
 	int playerScreenY = 24;
 	float viewDistance = 100.0f;
 	float runSpeed = 16.0f;
-	float courseDistance = 2000.0f;
+	float courseDistance = 5000.0f;
 	float traveledDistance = 0.0f;
 	float curveStrength = 0.0f;
 	float speedNotificationTimer = 0.0f;

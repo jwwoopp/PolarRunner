@@ -25,9 +25,32 @@ namespace
 	// 장애물 생성과 Enemy 구간 판정이 서로 다른 레인/거리 값을 쓰지 않도록
 	// 공유합니다.
 	constexpr float kLaneOffsets[] = { -0.55f, 0.0f, 0.55f };
-	constexpr float kEnemyZoneStarts[] = { 1120.0f, 1630.0f };
-	constexpr float kEnemyZoneEnds[] = { 1260.0f, 1770.0f };
-	constexpr int kEnemyZoneCount = 2;
+	// Enemy 전투는 반드시 Coast 지형 안에서 시작하고 끝납니다. 경고와 접근
+	// 시간까지 확보할 수 있도록 일반 장애물 구간보다 충분히 길게 잡습니다.
+	constexpr float kEnemyZoneStarts[] =
+	{
+		1120.0f, 1630.0f, 2580.0f, 3680.0f, 4480.0f
+	};
+	constexpr float kEnemyZoneEnds[] =
+	{
+		1280.0f, 1790.0f, 2800.0f, 3920.0f, 4770.0f
+	};
+	constexpr int kEnemyZoneCount =
+		static_cast<int>(sizeof(kEnemyZoneStarts) / sizeof(kEnemyZoneStarts[0]));
+	constexpr bool kRemoveEnemyAfterCoast = false;
+
+	bool IsInsideEnemyZone(float distance)
+	{
+		for (int zoneIndex = 0; zoneIndex < kEnemyZoneCount; ++zoneIndex)
+		{
+			if (distance >= kEnemyZoneStarts[zoneIndex]
+				&& distance <= kEnemyZoneEnds[zoneIndex])
+			{
+				return true;
+			}
+		}
+		return false;
+	}
 
 	void AppendPlaytestLog(const std::string& line)
 	{
@@ -135,7 +158,52 @@ void PolarLevel::BuildRoadCourse()
 		{ 1870.0f, 0.30f, 0.48f, TerrainType::NarrowIcePath },
 		{ 1930.0f, -0.30f, 0.52f, TerrainType::NarrowIcePath },
 		{ 1970.0f, 0.00f, 1.20f, TerrainType::Snowfield },
-		{ 2000.0f, 0.00f, 1.35f, TerrainType::Snowfield }
+		{ 2000.0f, 0.00f, 1.35f, TerrainType::Snowfield },
+
+		// 2000~2500m: 연구기지를 지나 협곡으로 들어가는 장거리 구간
+		{ 2080.0f, 0.35f, 1.05f, TerrainType::ResearchBase },
+		{ 2180.0f, -0.50f, 0.92f, TerrainType::ResearchBase },
+		{ 2300.0f, 0.45f, 0.72f, TerrainType::Canyon },
+		{ 2440.0f, -0.55f, 0.60f, TerrainType::Canyon },
+		{ 2520.0f, 0.00f, 1.20f, TerrainType::Coast },
+
+		// 세 번째 Enemy 해안. 전투 뒤에도 바다를 남겨 전환을 자연스럽게 합니다.
+		{ 2580.0f, -0.30f, 1.12f, TerrainType::Coast },
+		{ 2700.0f, 0.45f, 1.00f, TerrainType::Coast },
+		{ 2800.0f, -0.35f, 0.96f, TerrainType::Coast },
+		{ 2860.0f, 0.00f, 1.05f, TerrainType::Coast },
+
+		// 2900~3550m: 깨진 빙판과 좁은 길 뒤에 다시 넓은 설원
+		{ 2920.0f, 0.35f, 0.92f, TerrainType::BrokenIce },
+		{ 3040.0f, -0.30f, 0.52f, TerrainType::NarrowIcePath },
+		{ 3160.0f, 0.30f, 0.46f, TerrainType::NarrowIcePath },
+		{ 3260.0f, 0.00f, 1.25f, TerrainType::Snowfield },
+		{ 3400.0f, -0.55f, 1.05f, TerrainType::ResearchBase },
+		{ 3540.0f, 0.45f, 0.92f, TerrainType::ResearchBase },
+
+		// 네 번째 Enemy 해안
+		{ 3620.0f, 0.00f, 1.22f, TerrainType::Coast },
+		{ 3680.0f, 0.40f, 1.10f, TerrainType::Coast },
+		{ 3800.0f, -0.50f, 0.96f, TerrainType::Coast },
+		{ 3920.0f, 0.35f, 1.02f, TerrainType::Coast },
+		{ 3980.0f, 0.00f, 1.08f, TerrainType::Coast },
+
+		// 4050~4400m: 마지막 전투 전 고난도 지형
+		{ 4050.0f, 0.50f, 0.62f, TerrainType::Canyon },
+		{ 4170.0f, -0.45f, 0.88f, TerrainType::BrokenIce },
+		{ 4290.0f, 0.28f, 0.48f, TerrainType::NarrowIcePath },
+		{ 4400.0f, 0.00f, 1.18f, TerrainType::Snowfield },
+
+		// 다섯 번째이자 가장 긴 Enemy 해안
+		{ 4450.0f, -0.25f, 1.20f, TerrainType::Coast },
+		{ 4480.0f, 0.35f, 1.12f, TerrainType::Coast },
+		{ 4620.0f, -0.50f, 0.98f, TerrainType::Coast },
+		{ 4770.0f, 0.40f, 1.04f, TerrainType::Coast },
+		{ 4830.0f, 0.00f, 1.12f, TerrainType::Coast },
+
+		// 결승 직전에는 넓은 설원으로 시야를 열어 줍니다.
+		{ 4890.0f, -0.25f, 1.25f, TerrainType::Snowfield },
+		{ 5000.0f, 0.00f, 1.35f, TerrainType::Snowfield }
 	};
 }
 
@@ -342,21 +410,49 @@ void PolarLevel::BuildTestCourse()
 		}
 	}
 
+	// 고정 점프 구간 주변에는 랜덤 장애물을 만들지 않습니다. 그렇지 않으면
+	// BrokenBridge와 IceWall이 겹쳐 통과 불가능한 조합이 생길 수 있습니다.
+	const float lateAuthoredHazards[] =
+	{
+		1835.0f, 1905.0f, 1960.0f, 2990.0f, 3120.0f, 4210.0f, 4350.0f
+	};
+	const auto isNearLateAuthoredHazard = [&lateAuthoredHazards](float distance)
+	{
+		constexpr float reservedSpacing = 32.0f;
+		for (float hazardDistance : lateAuthoredHazards)
+		{
+			if (std::abs(distance - hazardDistance) < reservedSpacing)
+			{
+				return true;
+			}
+		}
+		return false;
+	};
+
 	// 후반부는 속도가 높으므로 장애물 간격을 급격히 줄이지 않습니다.
 	// 한 거리에는 하나만 배치해 항상 좌우 회피 공간을 남깁니다.
-	for (float distance = 1040.0f; distance < 1810.0f;)
+	for (float distance = 1040.0f; distance < 4930.0f;)
 	{
-		const bool isEnemyCombatSection =
-			(distance >= 1120.0f && distance <= 1260.0f)
-			|| (distance >= 1630.0f && distance <= 1770.0f);
-		if (!isEnemyCombatSection)
+		const bool isEnemyCombatSection = IsInsideEnemyZone(distance);
+		if (!isEnemyCombatSection && !isNearLateAuthoredHazard(distance))
 		{
 			const auto [lane, type] = randomObstacle();
 			spawnObstacle(lane, distance, type);
 		}
-		distance += distance < 1450.0f
-			? randomSpacing(42.0f, 58.0f)
-			: randomSpacing(34.0f, 48.0f);
+		if (distance < 2000.0f)
+		{
+			distance += distance < 1450.0f
+				? randomSpacing(42.0f, 58.0f)
+				: randomSpacing(34.0f, 48.0f);
+		}
+		else if (distance < 3500.0f)
+		{
+			distance += randomSpacing(30.0f, 43.0f);
+		}
+		else
+		{
+			distance += randomSpacing(26.0f, 38.0f);
+		}
 	}
 
 	// 결승 전에는 점프, 안전 레인 선택, 점프 순서로 마무리합니다.
@@ -365,6 +461,10 @@ void PolarLevel::BuildTestCourse()
 	brokenBridge(1835.0f + bridgeJitter(random));
 	wall(lanes[laneChoice(random)], 1905.0f + patternJitter(random));
 	spike(lanes[laneChoice(random)], 1960.0f + patternJitter(random));
+	brokenBridge(2990.0f + bridgeJitter(random));
+	brokenBridge(3120.0f + bridgeJitter(random));
+	brokenBridge(4210.0f + bridgeJitter(random));
+	wall(lanes[laneChoice(random)], 4350.0f + patternJitter(random));
 
 	// Obstacles are finalized before collectibles. Each star then selects a lane
 	// with enough same-lane clearance; obstacles in other lanes remain allowed.
@@ -372,7 +472,11 @@ void PolarLevel::BuildTestCourse()
 	{
 		90.0f, 195.0f, 315.0f, 450.0f, 575.0f, 750.0f, 890.0f,
 		1060.0f, 1160.0f, 1285.0f, 1415.0f, 1570.0f, 1660.0f,
-		1785.0f, 1880.0f, 1975.0f
+		1785.0f, 1880.0f, 1975.0f,
+		2070.0f, 2200.0f, 2340.0f, 2490.0f, 2600.0f, 2720.0f,
+		2840.0f, 2970.0f, 3090.0f, 3220.0f, 3350.0f, 3490.0f,
+		3630.0f, 3740.0f, 3860.0f, 3990.0f, 4120.0f, 4250.0f,
+		4380.0f, 4500.0f, 4620.0f, 4740.0f, 4860.0f, 4960.0f
 	};
 	constexpr float starObstacleSpacing = 20.0f;
 	for (float starDistance : starDistances)
@@ -544,7 +648,9 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 	// 격추하지 못한 채 플레이어가 해안(바다 배경)을 벗어나면 Enemy를
 	// 자동으로 소멸시킵니다. 그대로 두면 바다가 없는 지형에서도 배가
 	// 계속 쫓아오는 것처럼 보입니다.
-	if (coastEnemy && !coastEnemy->HasExpired() && terrain != TerrainType::Coast)
+	// 한번 접근한 Enemy는 지형 전환으로 제거하지 않고 격추될 때까지 추격합니다.
+	if (kRemoveEnemyAfterCoast && coastEnemy && !coastEnemy->HasExpired()
+		&& terrain != TerrainType::Coast)
 	{
 		coastEnemy->Destroy();
 		// 이미 발사된 탄환도 정리합니다. 그대로 두면 화면을 다 건너가기 전까지
@@ -749,14 +855,12 @@ void PolarLevel::CheckStarCollections()
 			currentY >= playerBodyTopY - collectionYTolerance
 			&& currentY <= playerBodyBottomY + collectionYTolerance;
 
-		// 논리 레인이 아니라 실제 화면 X와 펭귄 ASCII 폭을 비교합니다.
-		const int playerScreenX = GetRoadScreenX(
-			player->GetHorizontalPosition(), GetPlayerScreenY());
-		const int starScreenX = GetRoadScreenX(
-			star->GetHorizontalPosition(), currentY);
-		const int playerHalfWidth = player->IsJumping() ? 3 : 5;
+		// 화면 픽셀 폭이 아니라 같은 레인(정규화 좌표)에 있을 때만 수집되게
+		// 합니다. 픽셀 폭 비교는 근접한 옆 레인에서도 스치듯 먹히곤 했습니다.
+		constexpr float laneMatchTolerance = 0.25f;
 		const bool horizontalOverlap =
-			std::abs(playerScreenX - starScreenX) <= playerHalfWidth;
+			std::abs(player->GetHorizontalPosition()
+				- star->GetHorizontalPosition()) < laneMatchTolerance;
 		if (overlapsPlayerBody && horizontalOverlap)
 		{
 			star->Collect();
@@ -1212,8 +1316,11 @@ void PolarLevel::UpdateRunSpeed(float deltaTime)
 	constexpr float maximumForwardBonus = 2.0f;
 	constexpr float maximumCurvePenalty = 2.0f;
 
+	// 5000m 코스에서도 초반 가속 체감이 늦어지지 않도록 3500m에서
+	// 최고 진행 속도에 도달하고 이후에는 그 속도를 유지합니다.
+	constexpr float speedRampDistance = 3500.0f;
 	const float courseProgress = std::clamp(
-		traveledDistance / courseDistance, 0.0f, 1.0f);
+		traveledDistance / speedRampDistance, 0.0f, 1.0f);
 	const float progressionSpeed = startSpeed
 		+ (maximumProgressSpeed - startSpeed) * courseProgress;
 	const float forwardAmount = player ? std::clamp(
@@ -1233,9 +1340,13 @@ void PolarLevel::UpdateSpeedNotification(float deltaTime)
 	speedNotificationTimer = (std::max)(
 		0.0f, speedNotificationTimer - deltaTime);
 
-	constexpr float thresholds[] = { 250.0f, 500.0f, 750.0f };
-	const char* messages[] = { "SPEED UP!", "SPEED UP!!", "HIGH SPEED!" };
-	while (speedNotificationStage < 3
+	constexpr float thresholds[] = { 500.0f, 1500.0f, 2500.0f, 3500.0f };
+	const char* messages[] =
+	{
+		"SPEED UP!", "SPEED UP!!", "HIGH SPEED!", "MAX SPEED!"
+	};
+	constexpr int notificationCount = 4;
+	while (speedNotificationStage < notificationCount
 		&& traveledDistance >= thresholds[speedNotificationStage])
 	{
 		speedNotification = messages[speedNotificationStage];
@@ -1269,11 +1380,18 @@ void PolarLevel::DrawPerspectiveRoad()
 {
 	const int roadTopY = horizonY + 1;
 	const int roadBottomY = screenHeight - 1;
+	const bool keepCoastVisible = coastEnemy && !coastEnemy->HasExpired();
 
 	for (int y = roadTopY; y <= roadBottomY; ++y)
 	{
 		const float depth = ScreenYToRoadDepth(y);
-		const RoadSlice slice = CalculateRoadSlice(depth);
+		RoadSlice slice = CalculateRoadSlice(depth);
+		// Enemy가 살아 있는 동안에는 다음 코스 지형으로 화면이 교체되지
+		// 않도록 현재 도로 형태를 유지한 채 표면만 Coast로 출력합니다.
+		if (keepCoastVisible)
+		{
+			slice.terrain = TerrainType::Coast;
+		}
 
 		switch (slice.terrain)
 		{
@@ -1334,7 +1452,12 @@ void PolarLevel::DrawCoastRow(int y, float depth, const RoadSlice& slice)
 	// Enemy 구간 안이면 그 구간에서 정해둔 바다 방향을 따라가고,
 	// 그 외 해안 구간은 기존처럼 왼쪽에 바다를 둡니다.
 	bool oceanOnRight = false;
-	for (int zoneIndex = 0; zoneIndex < kEnemyZoneCount; ++zoneIndex)
+	if (coastEnemy && !coastEnemy->HasExpired())
+	{
+		// 추격 중에는 처음 등장했던 바다 방향을 그대로 유지합니다.
+		oceanOnRight = coastEnemy->GetSide() == EnemySide::Right;
+	}
+	else for (int zoneIndex = 0; zoneIndex < kEnemyZoneCount; ++zoneIndex)
 	{
 		if (slice.distance >= kEnemyZoneStarts[zoneIndex]
 			&& slice.distance <= kEnemyZoneEnds[zoneIndex])

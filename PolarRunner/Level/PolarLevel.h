@@ -105,6 +105,10 @@ private:
 	void OpenMenu(bool canResume, MenuLevel::Item defaultItem);
 	void RetryGame();
 
+	// 플레이테스트 계측
+	void LogEvent(const std::string& message) const;
+	void LogObstacleLayout() const;
+
 	enum class State
 	{
 		Playing,
@@ -148,4 +152,6 @@ private:
 	float enemyFireTimer = 0.0f;
 	float coastEnemyScreenX = 0.0f;
 	int enemyFirePatternIndex = 0;
+	bool coastEnemyWasActive = false;
+	float nextBalanceLogDistance = 100.0f;
 };

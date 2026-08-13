@@ -14,10 +14,40 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <fstream>
 #include <iomanip>
 #include <random>
 #include <sstream>
 #include <utility>
+
+namespace
+{
+	// 장애물 생성과 Enemy 구간 판정이 서로 다른 레인/거리 값을 쓰지 않도록
+	// 공유합니다.
+	constexpr float kLaneOffsets[] = { -0.55f, 0.0f, 0.55f };
+	constexpr float kEnemyZoneStarts[] = { 1120.0f, 1630.0f };
+	constexpr float kEnemyZoneEnds[] = { 1260.0f, 1770.0f };
+	constexpr int kEnemyZoneCount = 2;
+
+	void AppendPlaytestLog(const std::string& line)
+	{
+#ifdef _DEBUG
+		std::ofstream log("PlaytestLog.log", std::ios::app);
+		if (log.is_open())
+		{
+			log << line << "\n";
+		}
+#endif
+	}
+}
+
+void PolarLevel::LogEvent(const std::string& message) const
+{
+	std::ostringstream line;
+	line << "[" << std::fixed << std::setprecision(1) << traveledDistance
+		<< "m] " << message;
+	AppendPlaytestLog(line.str());
+}
 
 void PolarLevel::OnInitialized()
 {
@@ -29,6 +59,8 @@ void PolarLevel::OnInitialized()
 	player = SpawnActor<Player>();
 	BuildRoadCourse();
 	BuildTestCourse();
+	LogEvent("=== 새 런 시작 ===");
+	LogObstacleLayout();
 }
 
 void PolarLevel::BuildRoadCourse()
@@ -147,7 +179,7 @@ void PolarLevel::BuildTestCourse()
 		static_cast<unsigned int>(clockSeed >> 32)
 	};
 	std::mt19937 random(seed);
-	const float lanes[] = { -0.55f, 0.0f, 0.55f };
+	const float(&lanes)[3] = kLaneOffsets;
 	std::uniform_int_distribution<int> laneChoice(0, 2);
 	std::uniform_int_distribution<int> typeChoice(0, 2);
 	const auto randomSpacing = [&random](float minimum, float maximum)
@@ -363,6 +395,89 @@ void PolarLevel::BuildTestCourse()
 	}
 }
 
+void PolarLevel::LogObstacleLayout() const
+{
+	LogEvent("=== 장애물 배치 (" + std::to_string(obstacles.size()) + "개) ===");
+	for (const std::shared_ptr<PolarObstacle>& obstacle : obstacles)
+	{
+		std::ostringstream entry;
+		entry << "OBSTACLE " << GetObstacleName(obstacle->GetObstacleType())
+			<< " lane=" << std::fixed << std::setprecision(2)
+			<< obstacle->GetHorizontalPosition()
+			<< " dist=" << std::setprecision(1) << obstacle->GetDistance();
+		LogEvent(entry.str());
+	}
+
+	// Enemy 전용 해안 구간에는 일반 장애물이 없어야 합니다.
+	for (const std::shared_ptr<PolarObstacle>& obstacle : obstacles)
+	{
+		const float distance = obstacle->GetDistance();
+		for (int zoneIndex = 0; zoneIndex < kEnemyZoneCount; ++zoneIndex)
+		{
+			if (distance >= kEnemyZoneStarts[zoneIndex]
+				&& distance <= kEnemyZoneEnds[zoneIndex])
+			{
+				LogEvent("WARNING: Enemy 구간(zone " + std::to_string(zoneIndex)
+					+ ") 안에 " + GetObstacleName(obstacle->GetObstacleType())
+					+ " 장애물 발견 dist=" + std::to_string(distance));
+			}
+		}
+	}
+
+	// IceWall은 점프로 피할 수 없으므로 세 레인을 동시에 막으면 완주가
+	// 불가능합니다. 서로 다른 생성 구간(연속 랜덤/이중벽/조합 패턴)이 겹칠 때만
+	// 발생할 수 있는 조합이라 실행마다 자동으로 검사합니다.
+	constexpr float hazardWindow = 12.0f;
+	constexpr float laneMatchTolerance = 0.25f;
+	std::vector<float> warnedDistances;
+	for (const std::shared_ptr<PolarObstacle>& obstacle : obstacles)
+	{
+		if (obstacle->GetObstacleType() != ObstacleType::IceWall)
+		{
+			continue;
+		}
+		const float centerDistance = obstacle->GetDistance();
+		bool alreadyWarned = false;
+		for (float warned : warnedDistances)
+		{
+			if (std::abs(warned - centerDistance) < hazardWindow)
+			{
+				alreadyWarned = true;
+				break;
+			}
+		}
+		if (alreadyWarned)
+		{
+			continue;
+		}
+
+		bool laneBlocked[3] = { false, false, false };
+		for (const std::shared_ptr<PolarObstacle>& other : obstacles)
+		{
+			if (other->GetObstacleType() != ObstacleType::IceWall
+				|| std::abs(other->GetDistance() - centerDistance) > hazardWindow)
+			{
+				continue;
+			}
+			for (int laneIndex = 0; laneIndex < 3; ++laneIndex)
+			{
+				if (std::abs(other->GetHorizontalPosition()
+					- kLaneOffsets[laneIndex]) < laneMatchTolerance)
+				{
+					laneBlocked[laneIndex] = true;
+				}
+			}
+		}
+		if (laneBlocked[0] && laneBlocked[1] && laneBlocked[2])
+		{
+			LogEvent("WARNING: IceWall이 세 레인을 모두 막는 조합 발견 dist~="
+				+ std::to_string(centerDistance));
+			warnedDistances.push_back(centerDistance);
+		}
+	}
+	LogEvent("=== 장애물 배치 끝 ===");
+}
+
 void PolarLevel::Tick(float deltaTime)
 {
 	HandleMenuInput();
@@ -376,6 +491,15 @@ void PolarLevel::Tick(float deltaTime)
 	Level::Tick(deltaTime);
 	HandlePlayerFire();
 	traveledDistance += runSpeed * deltaTime;
+	while (nextBalanceLogDistance <= courseDistance
+		&& traveledDistance >= nextBalanceLogDistance)
+	{
+		std::ostringstream entry;
+		entry << "CHECKPOINT speed=" << std::fixed << std::setprecision(1)
+			<< runSpeed;
+		LogEvent(entry.str());
+		nextBalanceLogDistance += 100.0f;
+	}
 	UpdateCoastEnemy(deltaTime);
 	UpdateSpeedNotification(deltaTime);
 	CheckTerrainHazards(deltaTime);
@@ -385,33 +509,42 @@ void PolarLevel::Tick(float deltaTime)
 	if (traveledDistance >= courseDistance && IsPlaying())
 	{
 		state = State::Goal;
+		LogEvent("GOAL 도달 (speed=" + std::to_string(runSpeed) + ")");
 	}
 }
 
 void PolarLevel::UpdateCoastEnemy(float deltaTime)
 {
 	const TerrainType terrain = GetRoadProfile(traveledDistance).terrain;
-	constexpr float enemyZoneStarts[] = { 1120.0f, 1630.0f };
-	constexpr float enemyZoneEnds[] = { 1260.0f, 1770.0f };
-	constexpr int enemyZoneCount = 2;
 
 	// SHOT이 없는 채 구간을 통과했다면 다음 해안 구간을 기다립니다.
-	while (nextCoastEnemyZoneIndex < enemyZoneCount
-		&& traveledDistance > enemyZoneEnds[nextCoastEnemyZoneIndex])
+	while (nextCoastEnemyZoneIndex < kEnemyZoneCount
+		&& traveledDistance > kEnemyZoneEnds[nextCoastEnemyZoneIndex])
 	{
 		++nextCoastEnemyZoneIndex;
 		coastEnemyWarningTimer = 0.0f;
 	}
 
 	const bool hasActiveEnemy = coastEnemy && !coastEnemy->HasExpired();
+	if (coastEnemyWasActive && !hasActiveEnemy)
+	{
+		LogEvent("Enemy 제거됨 (격추 또는 소멸)");
+	}
+	coastEnemyWasActive = hasActiveEnemy;
+
 	const bool isInsideNextEnemyZone =
-		nextCoastEnemyZoneIndex < enemyZoneCount
-		&& traveledDistance >= enemyZoneStarts[nextCoastEnemyZoneIndex]
-		&& traveledDistance <= enemyZoneEnds[nextCoastEnemyZoneIndex];
+		nextCoastEnemyZoneIndex < kEnemyZoneCount
+		&& traveledDistance >= kEnemyZoneStarts[nextCoastEnemyZoneIndex]
+		&& traveledDistance <= kEnemyZoneEnds[nextCoastEnemyZoneIndex];
 
 	if (!hasActiveEnemy && isInsideNextEnemyZone
 		&& terrain == TerrainType::Coast && nonShotCount > 0)
 	{
+		if (coastEnemyWarningTimer <= 0.0f)
+		{
+			LogEvent("Enemy 경고 시작 zone="
+				+ std::to_string(nextCoastEnemyZoneIndex));
+		}
 		coastEnemyWarningTimer += deltaTime;
 		constexpr float warningDuration = 2.0f;
 		if (coastEnemyWarningTimer >= warningDuration)
@@ -424,6 +557,9 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 			coastEnemy = SpawnActor<Enemy>(initialDistance, spawnSide);
 			coastEnemyScreenX = spawnSide == EnemySide::Left
 				? screenWidth * 0.18f : screenWidth * 0.82f;
+			LogEvent("Enemy 출현 zone="
+				+ std::to_string(nextCoastEnemyZoneIndex)
+				+ " side=" + (spawnSide == EnemySide::Left ? "Left" : "Right"));
 			++nextCoastEnemyZoneIndex;
 			coastEnemyWarningTimer = 0.0f;
 		}
@@ -474,6 +610,7 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 		{
 			coastEnemyScreenX = static_cast<float>(desiredEnemyX);
 			coastEnemy->BeginChasing();
+			LogEvent("Enemy Chasing 진입");
 		}
 	}
 	else if (coastEnemy->GetState() == EnemyState::Chasing)
@@ -507,6 +644,8 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 			constexpr float bulletSpeed = 15.0f;
 			enemyBullets.emplace_back(SpawnActor<EnemyBullet>(
 				bulletPosition, coastEnemyOnRight ? -bulletSpeed : bulletSpeed));
+			LogEvent("Enemy 사격 pattern="
+				+ std::to_string(enemyFirePatternIndex));
 			enemyFirePatternIndex =
 				(enemyFirePatternIndex + 1) % firePatternCount;
 			enemyFireTimer = 0.0f;
@@ -674,6 +813,8 @@ void PolarLevel::CheckObstacleCollisions()
 			crashedObstacleType = obstacle->GetObstacleType();
 			fellThroughBrokenBridge = isBrokenBridge;
 			state = State::Crashed;
+			LogEvent(std::string("CRASH: ") + GetObstacleName(crashedObstacleType)
+				+ " speed=" + std::to_string(runSpeed));
 			return;
 		}
 		if ((!isBrokenBridge && obstacleScreenY > currentPlayerScreenY)
@@ -729,6 +870,8 @@ void PolarLevel::CheckEnemyBulletCollisions()
 				bullet->Destroy();
 				hitByEnemyBullet = true;
 				state = State::Crashed;
+				LogEvent("CRASH: Enemy 탄환 피격 speed="
+					+ std::to_string(runSpeed));
 				return;
 			}
 		}
@@ -764,6 +907,8 @@ void PolarLevel::CheckTerrainHazards(float deltaTime)
 		{
 			fellFromNarrowIcePath = true;
 			state = State::Crashed;
+			LogEvent("CRASH: 좁은 얼음길 추락 speed="
+				+ std::to_string(runSpeed));
 		}
 	}
 	else
@@ -965,6 +1110,8 @@ void PolarLevel::OpenMenu(bool canResume, MenuLevel::Item defaultItem)
 
 void PolarLevel::RetryGame()
 {
+	LogEvent("RETRY 요청 STAR=" + std::to_string(collectedStarCount)
+		+ " SHOT=" + std::to_string(nonShotCount));
 	Craft::Engine::Get().AddNewLevel<PolarLevel>();
 }
 

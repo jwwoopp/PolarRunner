@@ -15,6 +15,42 @@ PolarObstacle::PolarObstacle(float horizontalPosition, float distance,
 {
 }
 
+ScreenBounds PolarObstacle::GetIceWallScreenBounds() const
+{
+	ScreenBounds bounds;
+	std::shared_ptr<PolarLevel> level
+		= std::dynamic_pointer_cast<PolarLevel>(GetOwner());
+	if (!level)
+	{
+		return bounds;
+	}
+
+	const int y = level->DistanceToScreenY(distance);
+	const int x = level->GetRoadScreenX(horizontalPosition, y);
+	const float closeness = 1.0f - distance / level->GetViewDistance();
+
+	// Draw()의 근접 단계(closeness 기준)와 같은 폭을 쓰되, 위로 갈수록
+	// 좁아지는 지붕 행은 제외하고 일정 폭으로 그려지는 몸통 행만 씁니다.
+	int halfWidth = 1;
+	int bodyRowSpan = 0;
+	if (closeness > 0.72f)
+	{
+		halfWidth = 4;
+		bodyRowSpan = 2;
+	}
+	else if (closeness > 0.30f)
+	{
+		halfWidth = 3;
+		bodyRowSpan = 1;
+	}
+
+	bounds.left = x - halfWidth;
+	bounds.right = x + halfWidth;
+	bounds.top = y - bodyRowSpan;
+	bounds.bottom = y;
+	return bounds;
+}
+
 void PolarObstacle::Tick(float deltaTime)
 {
 	Actor::Tick(deltaTime);

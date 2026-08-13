@@ -145,11 +145,14 @@ void Player::Draw()
 	}
 	else
 	{
+		// 미끄러지는 꼬리 장식("____")은 판정 범위 밖까지 늘어져 있어서
+		// 몸통이 겹쳤는데도 통과한 것처럼 보였습니다. 몸통("(_____)")만
+		// 남기고, 머리에 붙어있던 방향 그대로 위치만 맞춰 그립니다.
 		const char* head = isFacingRight ? "___(o)> " : " <(o)___";
-		const char* body = isFacingRight ? "(_____)____" : "____(_____)";
+		const int bodyX = isFacingRight ? x - 5 : x - 1;
 		Craft::Renderer::Get().Submit(head, Craft::Vector2(x - 4, y - 1),
 			Craft::Color::BrightWhite, 100);
-		Craft::Renderer::Get().Submit(body, Craft::Vector2(x - 5, y),
+		Craft::Renderer::Get().Submit("(_____)", Craft::Vector2(bodyX, y),
 			Craft::Color::BrightWhite, 100);
 	}
 }

@@ -149,6 +149,9 @@ private:
 	std::shared_ptr<Enemy> coastEnemy;
 	int nextCoastEnemyZoneIndex = 0;
 	float coastEnemyWarningTimer = 0.0f;
+	// Enemy 구간(zone)별로 바다가 왼쪽/오른쪽 중 어디에 그려지는지.
+	// BuildTestCourse에서 채워지고 DrawCoastRow/UpdateCoastEnemy가 함께 참조.
+	std::vector<bool> coastOceanOnRight;
 	float enemyFireTimer = 0.0f;
 	float coastEnemyScreenX = 0.0f;
 	int enemyFirePatternIndex = 0;

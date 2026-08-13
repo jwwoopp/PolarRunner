@@ -113,10 +113,13 @@ void PolarLevel::BuildRoadCourse()
 		{ 1120.0f, 0.10f, 1.10f, TerrainType::Coast },
 		{ 1190.0f, -0.50f, 0.95f, TerrainType::Coast },
 		{ 1260.0f, 0.45f, 1.05f, TerrainType::Coast },
+		// Enemy 구간(kEnemyZoneEnds=1260) 이후에도 바다 배경이 한동안
+		// 유지되어야 격추할 시간이 충분합니다.
+		{ 1300.0f, 0.25f, 1.00f, TerrainType::Coast },
 
 		// 빠른 연속 조향을 요구하는 협곡과 연구기지입니다.
-		{ 1320.0f, 0.55f, 0.62f, TerrainType::Canyon },
-		{ 1390.0f, -0.55f, 0.58f, TerrainType::Canyon },
+		{ 1350.0f, 0.55f, 0.62f, TerrainType::Canyon },
+		{ 1420.0f, -0.55f, 0.58f, TerrainType::Canyon },
 		{ 1460.0f, 0.45f, 0.92f, TerrainType::ResearchBase },
 		{ 1540.0f, -0.45f, 0.88f, TerrainType::ResearchBase },
 
@@ -124,9 +127,11 @@ void PolarLevel::BuildRoadCourse()
 		{ 1630.0f, 0.00f, 1.15f, TerrainType::Coast },
 		{ 1700.0f, 0.50f, 1.00f, TerrainType::Coast },
 		{ 1770.0f, -0.45f, 0.95f, TerrainType::Coast },
+		// Enemy 구간(kEnemyZoneEnds=1770) 이후에도 바다 배경을 조금 더 유지합니다.
+		{ 1800.0f, -0.20f, 0.90f, TerrainType::Coast },
 
 		// 결승 전에는 다리 점프와 좁은 길 조향을 다시 확인합니다.
-		{ 1810.0f, 0.00f, 0.85f, TerrainType::BrokenIce },
+		{ 1825.0f, 0.00f, 0.85f, TerrainType::BrokenIce },
 		{ 1870.0f, 0.30f, 0.48f, TerrainType::NarrowIcePath },
 		{ 1930.0f, -0.30f, 0.52f, TerrainType::NarrowIcePath },
 		{ 1970.0f, 0.00f, 1.20f, TerrainType::Snowfield },
@@ -179,6 +184,17 @@ void PolarLevel::BuildTestCourse()
 		static_cast<unsigned int>(clockSeed >> 32)
 	};
 	std::mt19937 random(seed);
+
+	// 해안 구간마다 바다가 왼쪽/오른쪽 중 어느 쪽에 그려질지 미리 정해둡니다.
+	// DrawCoastRow와 Enemy 스폰 위치가 이 값을 함께 참조해서, 배가 항상
+	// 배경의 바다 쪽에서만 나타나도록 맞춥니다.
+	coastOceanOnRight.assign(kEnemyZoneCount, false);
+	std::uniform_int_distribution<int> oceanSideChoice(0, 1);
+	for (int zoneIndex = 0; zoneIndex < kEnemyZoneCount; ++zoneIndex)
+	{
+		coastOceanOnRight[zoneIndex] = oceanSideChoice(random) == 1;
+	}
+
 	const float(&lanes)[3] = kLaneOffsets;
 	std::uniform_int_distribution<int> laneChoice(0, 2);
 	std::uniform_int_distribution<int> typeChoice(0, 2);
@@ -525,6 +541,23 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 		coastEnemyWarningTimer = 0.0f;
 	}
 
+	// 격추하지 못한 채 플레이어가 해안(바다 배경)을 벗어나면 Enemy를
+	// 자동으로 소멸시킵니다. 그대로 두면 바다가 없는 지형에서도 배가
+	// 계속 쫓아오는 것처럼 보입니다.
+	if (coastEnemy && !coastEnemy->HasExpired() && terrain != TerrainType::Coast)
+	{
+		coastEnemy->Destroy();
+		// 이미 발사된 탄환도 정리합니다. 그대로 두면 화면을 다 건너가기 전까지
+		// 계속 날아다니다가, 지형이 한참 바뀐 뒤에도 플레이어를 맞힐 수 있습니다.
+		for (const std::shared_ptr<EnemyBullet>& bullet : enemyBullets)
+		{
+			if (bullet && !bullet->HasExpired())
+			{
+				bullet->Destroy();
+			}
+		}
+	}
+
 	const bool hasActiveEnemy = coastEnemy && !coastEnemy->HasExpired();
 	if (coastEnemyWasActive && !hasActiveEnemy)
 	{
@@ -550,10 +583,9 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 		if (coastEnemyWarningTimer >= warningDuration)
 		{
 			constexpr float initialDistance = 95.0f;
-			static std::mt19937 coastEnemySideRandom(std::random_device{}());
-			const EnemySide spawnSide =
-				std::uniform_int_distribution<int>(0, 1)(coastEnemySideRandom) == 0
-					? EnemySide::Left : EnemySide::Right;
+			// 배경(DrawCoastRow)에 바다가 그려지는 쪽과 맞춰서 스폰합니다.
+			const EnemySide spawnSide = coastOceanOnRight[nextCoastEnemyZoneIndex]
+				? EnemySide::Right : EnemySide::Left;
 			coastEnemy = SpawnActor<Enemy>(initialDistance, spawnSide);
 			coastEnemyScreenX = spawnSide == EnemySide::Left
 				? screenWidth * 0.18f : screenWidth * 0.82f;
@@ -761,13 +793,6 @@ void PolarLevel::CheckObstacleCollisions()
 			continue;
 		}
 
-		// Compare positions in the shared road coordinate system. Comparing two
-		// projected screen X values made nearby rows diverge on curved roads.
-		const float combinedHalfWidth = player->GetHorizontalHalfWidth()
-			+ obstacle->GetHorizontalHalfWidth();
-		const bool normalizedHorizontalOverlap =
-			std::abs(player->GetHorizontalPosition()
-				- obstacle->GetHorizontalPosition()) <= combinedHalfWidth;
 		// Near the collision row, LowSpike is drawn as "^^^^". Match that visible
 		// width against the sliding penguin's central body instead of estimating
 		// the contact only with normalized road coordinates.
@@ -781,11 +806,20 @@ void PolarLevel::CheckObstacleCollisions()
 		const bool puddleScreenOverlap =
 			playerCollisionX - 2 <= obstacleCollisionX + 3
 			&& playerCollisionX + 4 >= obstacleCollisionX - 4;
+		// IceWall은 거리에 따라 화면상 실제로 그려지는 폭(지붕 제외, 몸통만)이
+		// 크게 달라져서, 정규화 좌표만 비교하면 눈에 보이는 것과 판정이
+		// 어긋납니다(겹쳐 보이는데 안 맞거나, 반대로 안 겹쳐 보이는데 맞음).
+		// Draw()가 그리는 실제 몸통 범위와 플레이어 몸통(꼬리/부리 제외) 범위를
+		// 화면 좌표로 직접 비교합니다.
+		const ScreenBounds iceWallBounds = obstacle->GetIceWallScreenBounds();
+		const bool iceWallScreenOverlap =
+			playerCollisionX - 2 <= iceWallBounds.right
+			&& playerCollisionX + 3 >= iceWallBounds.left;
 		const ObstacleType obstacleType = obstacle->GetObstacleType();
 		const bool horizontalOverlap = obstacleType == ObstacleType::LowSpike
 			? spikeScreenOverlap
 			: (obstacleType == ObstacleType::Puddle
-				? puddleScreenOverlap : normalizedHorizontalOverlap);
+				? puddleScreenOverlap : iceWallScreenOverlap);
 		// Collision occurs only when the projected obstacle crosses the penguin's
 		// foot row from above. The swept row test also works at high run speeds.
 		const bool crossedPlayerRow =
@@ -813,8 +847,18 @@ void PolarLevel::CheckObstacleCollisions()
 			crashedObstacleType = obstacle->GetObstacleType();
 			fellThroughBrokenBridge = isBrokenBridge;
 			state = State::Crashed;
-			LogEvent(std::string("CRASH: ") + GetObstacleName(crashedObstacleType)
-				+ " speed=" + std::to_string(runSpeed));
+			std::ostringstream crashEntry;
+			crashEntry << "CRASH: " << GetObstacleName(crashedObstacleType)
+				<< " speed=" << runSpeed;
+			if (obstacleType == ObstacleType::IceWall)
+			{
+				// 판정에 쓰인 화면 좌표를 잠시 같이 남겨, 실제 벽 몸통 위치와
+				// 비교해볼 수 있게 합니다.
+				crashEntry << " playerX=[" << (playerCollisionX - 2) << ","
+					<< (playerCollisionX + 3) << "] wallX=["
+					<< iceWallBounds.left << "," << iceWallBounds.right << "]";
+			}
+			LogEvent(crashEntry.str());
 			return;
 		}
 		if ((!isBrokenBridge && obstacleScreenY > currentPlayerScreenY)
@@ -1248,9 +1292,31 @@ void PolarLevel::DrawSnowfieldRow(int y, float depth, const RoadSlice& slice)
 
 void PolarLevel::DrawCoastRow(int y, float depth, const RoadSlice& slice)
 {
-	DrawRoadEdges(y, slice, &PolarLevel::DrawOcean, &PolarLevel::DrawSnowSurface,
-		depth, 0.45f, ":", "~", "\\", "\\",
-		Craft::Color::Blue, Craft::Color::BrightWhite);
+	// Enemy 구간 안이면 그 구간에서 정해둔 바다 방향을 따라가고,
+	// 그 외 해안 구간은 기존처럼 왼쪽에 바다를 둡니다.
+	bool oceanOnRight = false;
+	for (int zoneIndex = 0; zoneIndex < kEnemyZoneCount; ++zoneIndex)
+	{
+		if (slice.distance >= kEnemyZoneStarts[zoneIndex]
+			&& slice.distance <= kEnemyZoneEnds[zoneIndex])
+		{
+			oceanOnRight = coastOceanOnRight[zoneIndex];
+			break;
+		}
+	}
+
+	if (oceanOnRight)
+	{
+		DrawRoadEdges(y, slice, &PolarLevel::DrawSnowSurface, &PolarLevel::DrawOcean,
+			depth, 0.45f, "\\", "\\", ":", "~",
+			Craft::Color::BrightWhite, Craft::Color::Blue);
+	}
+	else
+	{
+		DrawRoadEdges(y, slice, &PolarLevel::DrawOcean, &PolarLevel::DrawSnowSurface,
+			depth, 0.45f, ":", "~", "\\", "\\",
+			Craft::Color::Blue, Craft::Color::BrightWhite);
+	}
 }
 
 void PolarLevel::DrawCanyonRow(int y, float depth, const RoadSlice& slice)

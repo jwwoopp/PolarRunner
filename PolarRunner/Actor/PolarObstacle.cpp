@@ -26,6 +26,9 @@ ScreenBounds PolarObstacle::GetIceWallScreenBounds() const
 	}
 
 	const int y = level->DistanceToScreenY(distance);
+	// Draw()가 사용하는 것과 완전히 같은 X를 사용합니다. 커브에서는 Y행마다
+	// 도로 중심이 달라지므로 플레이어 Y행에서 다시 투영하면 화면에 보이는
+	// 벽과 충돌용 벽의 위치가 서로 달라집니다.
 	const int x = level->GetRoadScreenX(horizontalPosition, y);
 	const float closeness = 1.0f - distance / level->GetViewDistance();
 

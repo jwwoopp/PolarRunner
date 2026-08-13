@@ -149,7 +149,11 @@ void Player::Draw()
 		// 몸통이 겹쳤는데도 통과한 것처럼 보였습니다. 몸통("(_____)")만
 		// 남기고, 머리에 붙어있던 방향 그대로 위치만 맞춰 그립니다.
 		const char* head = isFacingRight ? "___(o)> " : " <(o)___";
-		const int bodyX = isFacingRight ? x - 5 : x - 1;
+		const int bodyX = x + GetBodyLeftOffset();
+		// 머리 중앙(눈 "o" 위치) 위에 작은 입김 장식.
+		const int breathX = isFacingRight ? x : x - 1;
+		Craft::Renderer::Get().Submit("~", Craft::Vector2(breathX, y - 2),
+			Craft::Color::Cyan, 100);
 		Craft::Renderer::Get().Submit(head, Craft::Vector2(x - 4, y - 1),
 			Craft::Color::BrightWhite, 100);
 		Craft::Renderer::Get().Submit("(_____)", Craft::Vector2(bodyX, y),

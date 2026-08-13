@@ -19,6 +19,11 @@ public:
 	}
 	inline bool IsJumping() const { return isJumping; }
 	inline bool IsFacingRight() const { return isFacingRight; }
+	// Draw()가 "(_____)" 몸통을 그리는 시작 X(중심 x 기준 오프셋). 충돌
+	// 판정도 같은 값을 써야 그려지는 위치와 어긋나지 않습니다.
+	inline int GetBodyLeftOffset() const { return isFacingRight ? -5 : -1; }
+	// "(_____)"는 7칸이라 왼쪽 끝에서 오른쪽 끝까지 6칸 떨어져 있습니다.
+	static constexpr int BodyWidth = 7;
 	bool IsAboveObstacle() const;
 	float GetJumpHeight() const;
 	int GetJumpScreenOffset() const;

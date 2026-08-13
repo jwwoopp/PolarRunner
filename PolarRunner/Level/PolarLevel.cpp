@@ -809,12 +809,24 @@ void PolarLevel::CheckObstacleCollisions()
 		// IceWall은 거리에 따라 화면상 실제로 그려지는 폭(지붕 제외, 몸통만)이
 		// 크게 달라져서, 정규화 좌표만 비교하면 눈에 보이는 것과 판정이
 		// 어긋납니다(겹쳐 보이는데 안 맞거나, 반대로 안 겹쳐 보이는데 맞음).
-		// Draw()가 그리는 실제 몸통 범위와 플레이어 몸통(꼬리/부리 제외) 범위를
-		// 화면 좌표로 직접 비교합니다.
+		// Draw()가 그리는 실제 몸통 범위와, 플레이어의 몸통("(_____)") 범위를
+		// 화면 좌표로 직접 비교합니다. 머리의 부리(">"/"<")는 몸통 문자열에
+		// 아예 포함되지 않으므로 판정에서 자연히 제외됩니다.
 		const ScreenBounds iceWallBounds = obstacle->GetIceWallScreenBounds();
+		// Player::Draw()가 실제로 "(_____)"를 그리는 시작 X와 동일한 계산을
+		// 씁니다. 판정 코드가 따로 계산하면 나중에 Draw() 쪽 값만 바뀌었을
+		// 때 둘이 어긋날 수 있습니다.
+		const int playerBodyLeft = playerCollisionX + player->GetBodyLeftOffset();
+		const int playerBodyRight = playerBodyLeft + (Player::BodyWidth - 1);
+		// IceWall의 외곽선("|")도 실제 벽으로 취급합니다. 플레이어 몸통의
+		// 괄호("("/")")가 외곽선에 닿는 순간부터 Crash입니다.
+		// ( 와 | 사이에 빈 칸 있음 -> 안전 / ( 와 | 가 닿음 -> Crash /
+		// ( 가 # 안으로 들어감 -> Crash
+		const int iceWallSolidLeft = iceWallBounds.left;
+		const int iceWallSolidRight = iceWallBounds.right;
 		const bool iceWallScreenOverlap =
-			playerCollisionX - 2 <= iceWallBounds.right
-			&& playerCollisionX + 3 >= iceWallBounds.left;
+			playerBodyLeft <= iceWallSolidRight
+			&& playerBodyRight >= iceWallSolidLeft;
 		const ObstacleType obstacleType = obstacle->GetObstacleType();
 		const bool horizontalOverlap = obstacleType == ObstacleType::LowSpike
 			? spikeScreenOverlap
@@ -830,9 +842,19 @@ void PolarLevel::CheckObstacleCollisions()
 		const bool crossedBridgeEntry =
 			previousContactScreenY <= currentPlayerScreenY
 			&& contactScreenY >= currentPlayerScreenY;
+		// IceWall의 현재 화면상 몸통 범위와 플레이어의 실제 미끄러짐 몸통 줄을
+		// 직접 비교합니다. 이전~현재 프레임 전체를 넓게 합치면 커브에서 벽이
+		// 이미 옆으로 이동한 뒤에도 과거 Y 범위 때문에 오충돌이 발생합니다.
+		const int playerBodyTop = currentPlayerScreenY;
+		const int playerBodyBottom = currentPlayerScreenY;
+		const bool iceWallVerticalOverlap =
+			iceWallBounds.bottom >= playerBodyTop
+			&& iceWallBounds.top <= playerBodyBottom;
 		const bool reachesPlayer = isBrokenBridge
 			? crossedBridgeEntry
-			: crossedPlayerRow;
+			: (obstacleType == ObstacleType::IceWall
+				? iceWallVerticalOverlap
+				: crossedPlayerRow);
 		const bool clearedLowSpike =
 			obstacleType == ObstacleType::LowSpike
 			&& player->IsAboveObstacle();
@@ -854,14 +876,23 @@ void PolarLevel::CheckObstacleCollisions()
 			{
 				// 판정에 쓰인 화면 좌표를 잠시 같이 남겨, 실제 벽 몸통 위치와
 				// 비교해볼 수 있게 합니다.
-				crashEntry << " playerX=[" << (playerCollisionX - 2) << ","
-					<< (playerCollisionX + 3) << "] wallX=["
+				crashEntry << " playerX=[" << playerBodyLeft << ","
+					<< playerBodyRight << "] wallX=["
 					<< iceWallBounds.left << "," << iceWallBounds.right << "]";
 			}
 			LogEvent(crashEntry.str());
 			return;
 		}
-		if ((!isBrokenBridge && obstacleScreenY > currentPlayerScreenY)
+		// IceWall의 실제 몸통 위쪽까지 플레이어 줄 아래로 지나간 뒤 검사 완료로
+		// 바꿉니다. 따라서 화면에 남아 있는 몸통 줄은 계속 충돌할 수 있습니다.
+		if (obstacleType == ObstacleType::IceWall)
+		{
+			if (iceWallBounds.top > playerBodyBottom)
+			{
+				obstacle->MarkChecked();
+			}
+		}
+		else if ((!isBrokenBridge && obstacleScreenY > currentPlayerScreenY)
 			|| (isBrokenBridge && contactScreenY > currentPlayerScreenY))
 		{
 			obstacle->MarkChecked();

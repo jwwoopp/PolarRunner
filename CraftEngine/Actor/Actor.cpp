@@ -9,8 +9,8 @@ namespace Craft
 		const Vector2& position,
 		Color color
 	)
-		: image(image), position(position), color(color),
-		width(static_cast<int>(image.size()))
+		: image(image), position(position), previousPosition(position),
+		color(color), width(static_cast<int>(image.size()))
 	{
 	}
 

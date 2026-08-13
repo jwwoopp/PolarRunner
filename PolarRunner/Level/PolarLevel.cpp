@@ -417,8 +417,13 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 		if (coastEnemyWarningTimer >= warningDuration)
 		{
 			constexpr float initialDistance = 95.0f;
-			coastEnemy = SpawnActor<Enemy>(initialDistance, EnemySide::Left);
-			coastEnemyScreenX = screenWidth * 0.18f;
+			static std::mt19937 coastEnemySideRandom(std::random_device{}());
+			const EnemySide spawnSide =
+				std::uniform_int_distribution<int>(0, 1)(coastEnemySideRandom) == 0
+					? EnemySide::Left : EnemySide::Right;
+			coastEnemy = SpawnActor<Enemy>(initialDistance, spawnSide);
+			coastEnemyScreenX = spawnSide == EnemySide::Left
+				? screenWidth * 0.18f : screenWidth * 0.82f;
 			++nextCoastEnemyZoneIndex;
 			coastEnemyWarningTimer = 0.0f;
 		}
@@ -450,17 +455,22 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 
 	const int playerScreenX = GetRoadScreenX(
 		player->GetHorizontalPosition(), GetPlayerScreenY());
-	const int roadLeftX = roadCenterX - roadHalfWidth;
-	const int maximumEnemyX = roadLeftX
-		- coastEnemy->GetWidth() - coastMargin;
-	const int desiredEnemyX = (std::min)(
-		playerScreenX - 25, maximumEnemyX);
+	const bool coastEnemyOnRight = coastEnemy->GetSide() == EnemySide::Right;
+	const int desiredEnemyX = coastEnemyOnRight
+		? (std::max)(playerScreenX + 25,
+			roadCenterX + roadHalfWidth + coastEnemy->GetWidth() + coastMargin)
+		: (std::min)(playerScreenX - 25,
+			roadCenterX - roadHalfWidth - coastEnemy->GetWidth() - coastMargin);
 
 	if (coastEnemy->GetState() == EnemyState::ClosingSide)
 	{
 		constexpr float sideApproachSpeed = 18.0f;
-		coastEnemyScreenX += sideApproachSpeed * deltaTime;
-		if (coastEnemyScreenX >= desiredEnemyX)
+		coastEnemyScreenX += coastEnemyOnRight
+			? -sideApproachSpeed * deltaTime : sideApproachSpeed * deltaTime;
+		const bool reachedDesired = coastEnemyOnRight
+			? coastEnemyScreenX <= desiredEnemyX
+			: coastEnemyScreenX >= desiredEnemyX;
+		if (reachedDesired)
 		{
 			coastEnemyScreenX = static_cast<float>(desiredEnemyX);
 			coastEnemy->BeginChasing();
@@ -490,10 +500,13 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 		{
 			const Craft::Vector2 enemyPosition = coastEnemy->GetPosition();
 			const Craft::Vector2 bulletPosition(
-				enemyPosition.x + coastEnemy->GetWidth(),
+				coastEnemyOnRight
+					? enemyPosition.x
+					: enemyPosition.x + coastEnemy->GetWidth(),
 				GetPlayerScreenY());
-			enemyBullets.emplace_back(
-				SpawnActor<EnemyBullet>(bulletPosition));
+			constexpr float bulletSpeed = 15.0f;
+			enemyBullets.emplace_back(SpawnActor<EnemyBullet>(
+				bulletPosition, coastEnemyOnRight ? -bulletSpeed : bulletSpeed));
 			enemyFirePatternIndex =
 				(enemyFirePatternIndex + 1) % firePatternCount;
 			enemyFireTimer = 0.0f;

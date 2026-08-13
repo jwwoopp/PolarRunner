@@ -16,8 +16,8 @@ void EnemyBullet::Tick(float deltaTime)
 	// x 위치 업데이트 (아래로 이동 처리).
 	xPosition += moveSpeed * deltaTime;
 
-	// 좌표 검사.
-	if (xPosition >= Engine::Get().GetWidth() - 1)
+	// 좌표 검사 (좌/우 어느 방향으로 발사되어도 화면 밖에서 정리됩니다).
+	if (xPosition <= 0.0f || xPosition >= Engine::Get().GetWidth() - 1)
 	{
 		Destroy();
 		return;

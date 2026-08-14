@@ -39,6 +39,9 @@ public:
 	virtual void OnInitialized() override;
 	virtual void Tick(float deltaTime) override;
 	virtual void Draw() override;
+	// 다음 PolarLevel이 시작할 코스 위치입니다. 타이틀의 테스트 진입에서만
+	// 사용하며, 일반 시작은 0m를 전달합니다.
+	static void SetNextStartDistance(float distance);
 
 	int DistanceToScreenY(float distance) const;
 	int GetRoadCenterX(int screenY) const;
@@ -65,6 +68,7 @@ private:
 	void CheckStarCollections();
 	void HandlePlayerFire();
 	void UpdateCoastEnemy(float deltaTime);
+	bool IsNarrowIcePathAhead(float lookAheadDistance) const;
 	void CheckTerrainHazards(float deltaTime);
 	void DrawSkyAndHorizon();
 	void DrawPerspectiveRoad();
@@ -126,8 +130,9 @@ private:
 	int playerScreenY = 24;
 	float viewDistance = 100.0f;
 	float runSpeed = 16.0f;
-	float courseDistance = 5000.0f;
+	float courseDistance = 15000.0f;
 	float traveledDistance = 0.0f;
+	inline static float nextStartDistance = 0.0f;
 	float curveStrength = 0.0f;
 	float speedNotificationTimer = 0.0f;
 	int speedNotificationStage = 0;

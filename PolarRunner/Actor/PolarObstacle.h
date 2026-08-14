@@ -30,6 +30,11 @@ public:
 	inline float GetHorizontalHalfWidth() const { return horizontalHalfWidth; }
 	inline bool HasBeenChecked() const { return hasBeenChecked; }
 	inline void MarkChecked() { hasBeenChecked = true; }
+	inline void SetCollisionDisplayDistance(float value)
+	{
+		distance = value;
+		previousDistance = value;
+	}
 
 	// Draw()가 그리는 IceWall 모양 중, 지붕(뾰족한 장식)을 제외한 단단한
 	// 몸통("|####|"/"|######|") 부분만의 화면 좌표 범위를 계산합니다.

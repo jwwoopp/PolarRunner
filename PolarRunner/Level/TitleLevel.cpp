@@ -18,6 +18,13 @@ void TitleLevel::Tick(float deltaTime)
 	if (input.GetKeyDown(VK_RETURN))
 	{
 		// 엔터를 누르면 실제 게임 시작.
+		PolarLevel::SetNextStartDistance(0.0f);
+		Craft::Engine::Get().AddNewLevel<PolarLevel>();
+	}
+	else if (input.GetKeyDown('B'))
+	{
+		// 첫 BrokenBridge가 화면 앞쪽에 보이는 지점부터 시작합니다.
+		PolarLevel::SetNextStartDistance(740.0f);
 		Craft::Engine::Get().AddNewLevel<PolarLevel>();
 	}
 	else if (input.GetKeyDown('T'))
@@ -54,6 +61,7 @@ void TitleLevel::Draw()
 	drawCenter("/ V \\", -2, Craft::Color::BrightWhite);
 	drawCenter("SOUTH POLE  ->  NORTH POLE", 0, Craft::Color::Cyan);
 	drawCenter("ENTER : START", 2, Craft::Color::Yellow);
-	drawCenter("T : SHOOT TEST", 3, Craft::Color::Cyan);
-	drawCenter("ESC : QUIT", 4, Craft::Color::BrightWhite);
+	drawCenter("B : BRIDGE TEST", 3, Craft::Color::Cyan);
+	drawCenter("T : SHOOT TEST", 4, Craft::Color::Cyan);
+	drawCenter("ESC : QUIT", 5, Craft::Color::BrightWhite);
 }

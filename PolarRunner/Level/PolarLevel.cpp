@@ -29,15 +29,18 @@ namespace
 	// 시간까지 확보할 수 있도록 일반 장애물 구간보다 충분히 길게 잡습니다.
 	constexpr float kEnemyZoneStarts[] =
 	{
-		1120.0f, 1630.0f, 2580.0f, 3680.0f, 4480.0f
+		1120.0f, 1630.0f, 2580.0f, 3680.0f, 4480.0f,
+		6120.0f, 6630.0f, 7580.0f, 8680.0f, 9480.0f,
+		11120.0f, 11630.0f, 12580.0f, 13680.0f, 14480.0f
 	};
 	constexpr float kEnemyZoneEnds[] =
 	{
-		1280.0f, 1790.0f, 2800.0f, 3920.0f, 4770.0f
+		1280.0f, 1790.0f, 2800.0f, 3920.0f, 4770.0f,
+		6280.0f, 6790.0f, 7800.0f, 8920.0f, 9770.0f,
+		11280.0f, 11790.0f, 12800.0f, 13920.0f, 14770.0f
 	};
 	constexpr int kEnemyZoneCount =
 		static_cast<int>(sizeof(kEnemyZoneStarts) / sizeof(kEnemyZoneStarts[0]));
-	constexpr bool kRemoveEnemyAfterCoast = false;
 
 	bool IsInsideEnemyZone(float distance)
 	{
@@ -75,6 +78,7 @@ void PolarLevel::LogEvent(const std::string& message) const
 void PolarLevel::OnInitialized()
 {
 	Level::OnInitialized();
+	traveledDistance = std::clamp(nextStartDistance, 0.0f, courseDistance);
 	screenWidth = Craft::Engine::Get().GetWidth();
 	screenHeight = Craft::Engine::Get().GetHeight();
 	horizonY = 7;
@@ -205,6 +209,31 @@ void PolarLevel::BuildRoadCourse()
 		{ 4890.0f, -0.25f, 1.25f, TerrainType::Snowfield },
 		{ 5000.0f, 0.00f, 1.35f, TerrainType::Snowfield }
 	};
+
+	// 첫 5000m에서 검증한 지형 흐름을 두 차례 더 이어 붙여 약 10분
+	// 코스를 구성합니다. 두 번째 구간은 좌우를 반전해 반복감을 줄입니다.
+	const std::vector<RoadSlice> baseCourse = roadSlices;
+	for (int repeatIndex = 1; repeatIndex <= 2; ++repeatIndex)
+	{
+		const float distanceOffset = 5000.0f * repeatIndex;
+		const float direction = repeatIndex % 2 == 1 ? -1.0f : 1.0f;
+		for (const RoadSlice& baseSlice : baseCourse)
+		{
+			if (baseSlice.distance <= 0.0f)
+			{
+				continue;
+			}
+			roadSlices.push_back(
+				{ baseSlice.distance + distanceOffset,
+				  baseSlice.centerOffset * direction,
+				  baseSlice.width, baseSlice.terrain });
+		}
+	}
+}
+
+void PolarLevel::SetNextStartDistance(float distance)
+{
+	nextStartDistance = (std::max)(0.0f, distance);
 }
 
 void PolarLevel::BuildTestCourse()
@@ -218,7 +247,8 @@ void PolarLevel::BuildTestCourse()
 		ObstacleType type, float horizontalHalfWidth)
 	{
 		obstacles.emplace_back(SpawnActor<PolarObstacle>(
-			horizontalPosition, distance, type, horizontalHalfWidth));
+			horizontalPosition, distance - traveledDistance,
+			type, horizontalHalfWidth));
 	};
 	const auto spike = [&add](float x, float distance)
 	{
@@ -431,7 +461,7 @@ void PolarLevel::BuildTestCourse()
 
 	// 후반부는 속도가 높으므로 장애물 간격을 급격히 줄이지 않습니다.
 	// 한 거리에는 하나만 배치해 항상 좌우 회피 공간을 남깁니다.
-	for (float distance = 1040.0f; distance < 4930.0f;)
+	for (float distance = 1040.0f; distance < 14930.0f;)
 	{
 		const bool isEnemyCombatSection = IsInsideEnemyZone(distance);
 		if (!isEnemyCombatSection && !isNearLateAuthoredHazard(distance))
@@ -449,9 +479,15 @@ void PolarLevel::BuildTestCourse()
 		{
 			distance += randomSpacing(30.0f, 43.0f);
 		}
-		else
+		else if (distance < 10000.0f)
 		{
 			distance += randomSpacing(26.0f, 38.0f);
+		}
+		else
+		{
+			// 최고 속도 구간에서도 연속 회피가 불가능해지지 않도록
+			// 최소 간격은 더 줄이지 않습니다.
+			distance += randomSpacing(26.0f, 36.0f);
 		}
 	}
 
@@ -468,7 +504,7 @@ void PolarLevel::BuildTestCourse()
 
 	// Obstacles are finalized before collectibles. Each star then selects a lane
 	// with enough same-lane clearance; obstacles in other lanes remain allowed.
-	const float starDistances[] =
+	std::vector<float> starDistances =
 	{
 		90.0f, 195.0f, 315.0f, 450.0f, 575.0f, 750.0f, 890.0f,
 		1060.0f, 1160.0f, 1285.0f, 1415.0f, 1570.0f, 1660.0f,
@@ -478,6 +514,13 @@ void PolarLevel::BuildTestCourse()
 		3630.0f, 3740.0f, 3860.0f, 3990.0f, 4120.0f, 4250.0f,
 		4380.0f, 4500.0f, 4620.0f, 4740.0f, 4860.0f, 4960.0f
 	};
+	// 5000m 이후에도 별을 일정하게 공급하되 간격을 조금 흔들어
+	// 같은 위치가 반복되는 느낌을 줄입니다.
+	for (float distance = 5100.0f; distance < 14950.0f;
+		distance += randomSpacing(105.0f, 145.0f))
+	{
+		starDistances.emplace_back(distance);
+	}
 	constexpr float starObstacleSpacing = 20.0f;
 	for (float starDistance : starDistances)
 	{
@@ -510,7 +553,7 @@ void PolarLevel::BuildTestCourse()
 				0, static_cast<int>(safeLaneIndices.size()) - 1);
 			const int laneIndex = safeLaneIndices[safeLaneChoice(random)];
 			stars.emplace_back(SpawnActor<PolarStar>(
-				lanes[laneIndex], starDistance));
+				lanes[laneIndex], starDistance - traveledDistance));
 		}
 	}
 }
@@ -636,8 +679,30 @@ void PolarLevel::Tick(float deltaTime)
 void PolarLevel::UpdateCoastEnemy(float deltaTime)
 {
 	const TerrainType terrain = GetRoadProfile(traveledDistance).terrain;
-	coastVisualHoldTimer = (std::max)(
-		0.0f, coastVisualHoldTimer - deltaTime);
+
+	// Do not carry a shooting encounter into a narrow, slippery section.
+	// The enemy retreats while the narrow path is still far enough away to be
+	// read normally, so the authored road is never hidden and then swapped back.
+	constexpr float enemyRetreatBeforeSlipDistance = 120.0f;
+	if (coastEnemy && !coastEnemy->HasExpired()
+		&& IsNarrowIcePathAhead(enemyRetreatBeforeSlipDistance))
+	{
+		LogEvent("Enemy retreat before narrow ice path");
+		coastEnemy->Destroy();
+		for (const std::shared_ptr<EnemyBullet>& bullet : enemyBullets)
+		{
+			if (bullet && !bullet->HasExpired())
+			{
+				bullet->Destroy();
+			}
+		}
+
+		// This is an intentional early retreat while the current authored terrain
+		// is still Coast. Do not start the post-kill coast override, otherwise the
+		// upcoming narrow path would be concealed and appear suddenly later.
+		enemyFireTimer = 0.0f;
+		enemyFirePatternIndex = 0;
+	}
 
 	// SHOT이 없는 채 구간을 통과했다면 다음 해안 구간을 기다립니다.
 	while (nextCoastEnemyZoneIndex < kEnemyZoneCount
@@ -651,7 +716,7 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 	// 자동으로 소멸시킵니다. 그대로 두면 바다가 없는 지형에서도 배가
 	// 계속 쫓아오는 것처럼 보입니다.
 	// 한번 접근한 Enemy는 지형 전환으로 제거하지 않고 격추될 때까지 추격합니다.
-	if (kRemoveEnemyAfterCoast && coastEnemy && !coastEnemy->HasExpired()
+	if (coastEnemy && !coastEnemy->HasExpired()
 		&& terrain != TerrainType::Coast)
 	{
 		coastEnemy->Destroy();
@@ -670,19 +735,22 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 	if (coastEnemyWasActive && !hasActiveEnemy)
 	{
 		LogEvent("Enemy 제거됨 (격추 또는 소멸)");
-		// 배가 사라진 직후 지형이 한 프레임 만에 교체되지 않도록 해안을
-		// 잠시 더 유지한 뒤 원래 코스로 돌아갑니다.
-		coastVisualHoldTimer = 2.5f;
+		// 새 지형이 지평선부터 내려오도록 전환 시간을 시작합니다.
+		enemyFireTimer = 0.0f;
+		enemyFirePatternIndex = 0;
 	}
-	coastEnemyWasActive = hasActiveEnemy;
 
 	const bool isInsideNextEnemyZone =
 		nextCoastEnemyZoneIndex < kEnemyZoneCount
 		&& traveledDistance >= kEnemyZoneStarts[nextCoastEnemyZoneIndex]
 		&& traveledDistance <= kEnemyZoneEnds[nextCoastEnemyZoneIndex];
 
+	constexpr float enemySpawnClearanceFromSlip = 220.0f;
+	const bool hasSafeCombatSpace =
+		!IsNarrowIcePathAhead(enemySpawnClearanceFromSlip);
 	if (!hasActiveEnemy && isInsideNextEnemyZone
-		&& terrain == TerrainType::Coast && nonShotCount > 0)
+		&& terrain == TerrainType::Coast && nonShotCount > 0
+		&& hasSafeCombatSpace)
 	{
 		if (coastEnemyWarningTimer <= 0.0f)
 		{
@@ -697,8 +765,6 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 			// 배경(DrawCoastRow)에 바다가 그려지는 쪽과 맞춰서 스폰합니다.
 			const EnemySide spawnSide = coastOceanOnRight[nextCoastEnemyZoneIndex]
 				? EnemySide::Right : EnemySide::Left;
-			heldCoastOceanOnRight = spawnSide == EnemySide::Right;
-			coastVisualHoldTimer = 0.0f;
 			coastEnemy = SpawnActor<Enemy>(initialDistance, spawnSide);
 			coastEnemyScreenX = spawnSide == EnemySide::Left
 				? screenWidth * 0.18f : screenWidth * 0.82f;
@@ -784,11 +850,11 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 		// UpdateRunSpeed와 같은 방식으로 코스 진행률에 따라 발사 간격을
 		// 점점 줄여, 뒤쪽 해안 구간일수록 더 자주(연사에 가깝게) 쏘게 합니다.
 		const float* fireIntervals = earlyFireIntervals;
-		if (traveledDistance >= 3500.0f)
+		if (traveledDistance >= 10000.0f)
 		{
 			fireIntervals = lateFireIntervals;
 		}
-		else if (traveledDistance >= 2000.0f)
+		else if (traveledDistance >= 5000.0f)
 		{
 			fireIntervals = middleFireIntervals;
 		}
@@ -815,6 +881,25 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 	{
 		enemyFireTimer = 0.0f;
 	}
+}
+
+bool PolarLevel::IsNarrowIcePathAhead(float lookAheadDistance) const
+{
+	constexpr float sampleStep = 5.0f;
+	const float safeLookAhead = (std::max)(0.0f, lookAheadDistance);
+	const float endDistance = (std::min)(
+		courseDistance, traveledDistance + safeLookAhead);
+
+	for (float distance = traveledDistance;
+		distance <= endDistance; distance += sampleStep)
+	{
+		if (GetRoadProfile(distance).terrain == TerrainType::NarrowIcePath)
+		{
+			return true;
+		}
+	}
+
+	return GetRoadProfile(endDistance).terrain == TerrainType::NarrowIcePath;
 }
 
 void PolarLevel::HandlePlayerFire()
@@ -844,7 +929,9 @@ void PolarLevel::HandlePlayerFire()
 
 void PolarLevel::CheckStarCollections()
 {
-	if (!player)
+	// 별은 펭귄이 지면에서 같은 진행선과 레인에 있을 때만 수집합니다.
+	// 점프 연출로 별의 화면 Y와 겹치는 경우는 수집하지 않습니다.
+	if (!player || player->IsJumping())
 	{
 		return;
 	}
@@ -907,11 +994,21 @@ void PolarLevel::CheckObstacleCollisions()
 		const int currentPlayerScreenY = GetPlayerScreenY();
 		const bool isBrokenBridge =
 			obstacle->GetObstacleType() == ObstacleType::BrokenBridge;
+		// BrokenBridge::Draw changes the water row according to perspective.
+		// Use the same thresholds here; a fixed y - 1 contact row made the
+		// medium-sized bridge collide one visible row before its water reached
+		// the penguin.
+		const auto getBridgeWaterScreenY = [this](float distance, int screenY)
+		{
+			const float closeness = 1.0f - distance / viewDistance;
+			return closeness > 0.80f ? screenY - 1 : screenY;
+		};
 		const int contactScreenY = isBrokenBridge
-			? obstacleScreenY - 1
+			? getBridgeWaterScreenY(obstacle->GetDistance(), obstacleScreenY)
 			: obstacleScreenY;
 		const int previousContactScreenY = isBrokenBridge
-			? previousObstacleScreenY - 1
+			? getBridgeWaterScreenY(obstacle->GetPreviousDistance(),
+				previousObstacleScreenY)
 			: previousObstacleScreenY;
 		if (obstacle->GetDistance() < -2.0f)
 		{
@@ -969,9 +1066,13 @@ void PolarLevel::CheckObstacleCollisions()
 			&& obstacleScreenY >= currentPlayerScreenY;
 		// The blue water row is the actual gap. The white row above it is only a
 		// visual crack, so it must not trigger an early fall.
+		// Give the projected water row one visual cell to reach the penguin's
+		// feet. Integer perspective projection can otherwise report the crossing
+		// while a black row is still visible between the feet and the gap.
+		const int bridgeFallScreenY = currentPlayerScreenY + 1;
 		const bool crossedBridgeEntry =
-			previousContactScreenY <= currentPlayerScreenY
-			&& contactScreenY >= currentPlayerScreenY;
+			previousContactScreenY <= bridgeFallScreenY
+			&& contactScreenY >= bridgeFallScreenY;
 		// IceWall의 현재 화면상 몸통 범위와 플레이어의 실제 미끄러짐 몸통 줄을
 		// 직접 비교합니다. 이전~현재 프레임 전체를 넓게 합치면 커브에서 벽이
 		// 이미 옆으로 이동한 뒤에도 과거 Y 범위 때문에 오충돌이 발생합니다.
@@ -986,12 +1087,27 @@ void PolarLevel::CheckObstacleCollisions()
 			&& player->IsAboveObstacle();
 		const bool clearedPuddle = obstacleType == ObstacleType::Puddle
 			&& player->GetJumpHeight() >= 0.25f;
-		// 다리는 오직 펭귄이 충분히 뛰었을 때만 건너는 것이 가능(점프 높이 3 이상).
+		// 화면에서 펭귄이 3칸 이상 떠 있을 때 다리를 통과합니다.
+		// 렌더링과 동일한 정수 화면 높이를 사용해, 충분히 떠 보이는데도
+		// 부동소수점 높이 경계 때문에 추락하는 상황을 방지합니다.
+		// A bridge gap has no physical height to clear. Any real airborne state
+		// clears it; unlike the old jumpIntent check, holding Space alone does not
+		// count because Player::IsJumping() is controlled by the fixed jump timer.
 		const bool clearedBrokenBridge = isBrokenBridge
-			&& player->GetJumpHeight() >= 0.6f;
+			&& player->IsJumping();
 		if ((isBrokenBridge || horizontalOverlap) && reachesPlayer
 			&& !clearedLowSpike && !clearedPuddle && !clearedBrokenBridge)
 		{
+			if (isBrokenBridge)
+			{
+				// The swept test may detect a crossing after a fast bridge has
+				// already advanced several console rows. Freeze the crash display
+				// with its near water row on the actual fall line instead of showing
+				// the bridge well below the penguin.
+				const int nearBridgeBaseY = bridgeFallScreenY + 1;
+				obstacle->SetCollisionDisplayDistance(
+					ScreenYToDistance(nearBridgeBaseY));
+			}
 			crashedObstacleType = obstacle->GetObstacleType();
 			fellThroughBrokenBridge = isBrokenBridge;
 			state = State::Crashed;
@@ -1006,11 +1122,16 @@ void PolarLevel::CheckObstacleCollisions()
 					<< playerBodyRight << "] wallX=["
 					<< iceWallBounds.left << "," << iceWallBounds.right << "]";
 			}
+			else if (isBrokenBridge)
+			{
+				crashEntry << " jumpHeight=" << player->GetJumpHeight()
+					<< " jumpOffset=" << player->GetJumpScreenOffset();
+			}
 			LogEvent(crashEntry.str());
 			return;
 		}
 		if ((!isBrokenBridge && obstacleScreenY > currentPlayerScreenY)
-			|| (isBrokenBridge && contactScreenY > currentPlayerScreenY))
+			|| (isBrokenBridge && contactScreenY > bridgeFallScreenY))
 		{
 			obstacle->MarkChecked();
 		}
@@ -1316,18 +1437,34 @@ const char* PolarLevel::GetCurveDirection() const
 
 void PolarLevel::UpdateRunSpeed(float deltaTime)
 {
-	constexpr float startSpeed = 16.0f;
-	constexpr float maximumProgressSpeed = 28.0f;
 	constexpr float maximumForwardBonus = 2.0f;
 	constexpr float maximumCurvePenalty = 2.0f;
 
-	// 5000m 코스에서도 초반 가속 체감이 늦어지지 않도록 3500m에서
-	// 최고 진행 속도에 도달하고 이후에는 그 속도를 유지합니다.
-	constexpr float speedRampDistance = 3500.0f;
-	const float courseProgress = std::clamp(
-		traveledDistance / speedRampDistance, 0.0f, 1.0f);
-	const float progressionSpeed = startSpeed
-		+ (maximumProgressSpeed - startSpeed) * courseProgress;
+	// 약 10분 코스 전체에서 속도가 계속 상승하도록 3000m 단위로
+	// 목표 속도를 높입니다. 구간 내부는 보간하여 갑작스러운 변화는 피합니다.
+	constexpr float speedDistances[] =
+	{
+		0.0f, 3000.0f, 6000.0f, 9000.0f, 12000.0f, 15000.0f
+	};
+	constexpr float speedValues[] =
+	{
+		16.0f, 20.0f, 24.0f, 28.0f, 32.0f, 35.0f
+	};
+	constexpr int speedPointCount = 6;
+	float progressionSpeed = speedValues[speedPointCount - 1];
+	for (int index = 1; index < speedPointCount; ++index)
+	{
+		if (traveledDistance <= speedDistances[index])
+		{
+			const float amount = std::clamp(
+				(traveledDistance - speedDistances[index - 1])
+				/ (speedDistances[index] - speedDistances[index - 1]),
+				0.0f, 1.0f);
+			progressionSpeed = speedValues[index - 1]
+				+ (speedValues[index] - speedValues[index - 1]) * amount;
+			break;
+		}
+	}
 	const float forwardAmount = player ? std::clamp(
 		-static_cast<float>(player->GetLongitudinalScreenOffset()) / 8.0f,
 		0.0f, 1.0f) : 0.0f;
@@ -1345,7 +1482,7 @@ void PolarLevel::UpdateSpeedNotification(float deltaTime)
 	speedNotificationTimer = (std::max)(
 		0.0f, speedNotificationTimer - deltaTime);
 
-	constexpr float thresholds[] = { 500.0f, 1500.0f, 2500.0f, 3500.0f };
+	constexpr float thresholds[] = { 3000.0f, 6000.0f, 9000.0f, 12000.0f };
 	const char* messages[] =
 	{
 		"SPEED UP!", "SPEED UP!!", "HIGH SPEED!", "MAX SPEED!"
@@ -1385,9 +1522,15 @@ void PolarLevel::DrawPerspectiveRoad()
 {
 	const int roadTopY = horizonY + 1;
 	const int roadBottomY = screenHeight - 1;
-	const bool keepCoastVisible =
-		(coastEnemy && !coastEnemy->HasExpired())
-		|| coastVisualHoldTimer > 0.0f;
+	const bool hasVisibleEnemy = coastEnemy && !coastEnemy->HasExpired();
+	// Enemy 제거 후 Coast를 한 번에 끄지 않습니다. 새 지형은 먼 지평선에서
+	// 나타나 아래로 내려오고, 기존 바다는 가까운 화면 아래로 밀려납니다.
+	// Enemy may be destroyed after this level's Tick during Actor collision
+	// processing. Keep the coast on that removal frame too, preventing the
+	// underlying course terrain from flashing for one frame.
+	const bool keepCoastVisual = hasVisibleEnemy
+		|| coastVisualHoldTimer > 0.0f
+		|| coastEnemyWasActive;
 
 	for (int y = roadTopY; y <= roadBottomY; ++y)
 	{
@@ -1395,11 +1538,6 @@ void PolarLevel::DrawPerspectiveRoad()
 		RoadSlice slice = CalculateRoadSlice(depth);
 		// Enemy가 살아 있는 동안에는 다음 코스 지형으로 화면이 교체되지
 		// 않도록 현재 도로 형태를 유지한 채 표면만 Coast로 출력합니다.
-		if (keepCoastVisible)
-		{
-			slice.terrain = TerrainType::Coast;
-		}
-
 		switch (slice.terrain)
 		{
 		case TerrainType::Snowfield:
@@ -1459,11 +1597,10 @@ void PolarLevel::DrawCoastRow(int y, float depth, const RoadSlice& slice)
 	// Enemy 구간 안이면 그 구간에서 정해둔 바다 방향을 따라가고,
 	// 그 외 해안 구간은 기존처럼 왼쪽에 바다를 둡니다.
 	bool oceanOnRight = false;
-	if ((coastEnemy && !coastEnemy->HasExpired())
-		|| coastVisualHoldTimer > 0.0f)
+	if (coastOceanOnRight.empty())
 	{
 		// 추격 중에는 처음 등장했던 바다 방향을 그대로 유지합니다.
-		oceanOnRight = heldCoastOceanOnRight;
+		oceanOnRight = false;
 	}
 	else for (int zoneIndex = 0; zoneIndex < kEnemyZoneCount; ++zoneIndex)
 	{
@@ -1621,7 +1758,7 @@ void PolarLevel::DrawHud()
 {
 	const float displayDistance = GetDisplayDistanceMeters();
 	std::ostringstream hud;
-	hud << "POLAR RUNNER  DIST: ";
+	hud << "DISTANCE: ";
 	if (displayDistance < 1000.0f)
 	{
 		hud << static_cast<int>(displayDistance) << " m";
@@ -1631,38 +1768,67 @@ void PolarLevel::DrawHud()
 		hud << std::fixed << std::setprecision(1)
 			<< displayDistance / 1000.0f << " km";
 	}
-	hud << std::fixed << std::setprecision(1)
-		<< "  SPEED: " << runSpeed
-		<< "  ROAD: " << GetCurveDirection()
-		<< "  STAR: " << collectedStarCount << " / " << RequiredStarCount
-		<< "  SHOT: " << nonShotCount;
-	Craft::Renderer::Get().Submit(hud.str(), Craft::Vector2(1, 0),
+	hud << std::fixed << std::setprecision(1);
+
+	constexpr int panelWidth = 30;
+	const std::string border = "+" + std::string(panelWidth - 2, '-') + "+";
+	Craft::Renderer::Get().Submit(border, Craft::Vector2(0, 0),
 		Craft::Color::BrightWhite, 1000);
-	Craft::Renderer::Get().Submit("ARROWS: Glide / Forward / Back   SPACE: Jump   ESC: Menu",
-		Craft::Vector2(1, 1), Craft::Color::Cyan, 1000);
+	Craft::Renderer::Get().Submit(border, Craft::Vector2(0, 5),
+		Craft::Color::BrightWhite, 1000);
+	for (int row = 1; row < 5; ++row)
+	{
+		Craft::Renderer::Get().Submit("|", Craft::Vector2(0, row),
+			Craft::Color::BrightWhite, 1000);
+		Craft::Renderer::Get().Submit("|", Craft::Vector2(panelWidth - 1, row),
+			Craft::Color::BrightWhite, 1000);
+	}
+
+	const auto makeSlots = [](int count, int capacity, char filled)
+	{
+		std::string slots = "[";
+		slots.append(std::clamp(count, 0, capacity), filled);
+		slots.append(capacity - std::clamp(count, 0, capacity), '-');
+		return slots + "]";
+	};
+	const std::string starHud = "STAR: "
+		+ makeSlots(collectedStarCount, RequiredStarCount, '*')
+		+ " " + std::to_string(collectedStarCount)
+		+ "/" + std::to_string(RequiredStarCount);
+	const std::string shotHud = "SHOT: "
+		+ makeSlots(nonShotCount, 5, '@')
+		+ " " + std::to_string(nonShotCount);
+
+	std::ostringstream statusHud;
+	statusHud << std::fixed << std::setprecision(1)
+		<< "SPEED: " << runSpeed;
+
+	Craft::Renderer::Get().Submit(hud.str(), Craft::Vector2(2, 1),
+		Craft::Color::BrightWhite, 1000);
+	Craft::Renderer::Get().Submit(statusHud.str(), Craft::Vector2(2, 2),
+		Craft::Color::Cyan, 1000);
+	Craft::Renderer::Get().Submit(starHud, Craft::Vector2(2, 3),
+		Craft::Color::Yellow, 1000);
+	Craft::Renderer::Get().Submit(shotHud, Craft::Vector2(2, 4),
+		Craft::Color::Red, 1000);
+	Craft::Renderer::Get().Submit(
+		"SPACE Jump  F Fire  ESC Menu",
+		Craft::Vector2(1, 6), Craft::Color::Cyan, 1000);
 	if (speedNotificationTimer > 0.0f)
 	{
 		Craft::Renderer::Get().Submit(speedNotification,
 			Craft::Vector2(screenWidth / 2
-				- static_cast<int>(speedNotification.size()) / 2, 3),
+				- static_cast<int>(speedNotification.size()) / 2, 8),
 			speedNotificationStage >= 3
 				? Craft::Color::Yellow : Craft::Color::Cyan,
 			1600);
-	}
-	if (nonShotCount > 0)
-	{
-		const std::string ready = "SHOT READY!";
-		Craft::Renderer::Get().Submit(ready,
-			Craft::Vector2(screenWidth / 2
-				- static_cast<int>(ready.size()) / 2, 2),
-			Craft::Color::Green, 1600);
 	}
 	if (coastEnemyWarningTimer > 0.0f)
 	{
 		const std::string warning = "ENEMY SHIP APPROACHING!";
 		Craft::Renderer::Get().Submit(warning,
 			Craft::Vector2(screenWidth / 2
-				- static_cast<int>(warning.size()) / 2, 4),
+				- static_cast<int>(warning.size()) / 2, 9),
 			Craft::Color::Red, 1700);
 	}
 	if (IsPlaying() && IsOnNarrowIcePath())
@@ -1675,7 +1841,7 @@ void PolarLevel::DrawHud()
 			: "CAUTION: SLIPPERY NARROW ICE";
 		Craft::Renderer::Get().Submit(warning,
 			Craft::Vector2(screenWidth / 2
-				- static_cast<int>(warning.size()) / 2, 2),
+				- static_cast<int>(warning.size()) / 2, 7),
 			nearEdge ? Craft::Color::Red : Craft::Color::Yellow, 1500);
 	}
 

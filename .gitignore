@@ -38,7 +38,7 @@ Testing/
 .cache/
 
 # Local presentation and files accidentally created by Git command input
-/발표자료_초안.pdf
+*.pdf
 /git
 /main
 /how 492ec5d --stat

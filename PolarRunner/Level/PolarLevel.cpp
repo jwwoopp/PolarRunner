@@ -636,6 +636,8 @@ void PolarLevel::Tick(float deltaTime)
 void PolarLevel::UpdateCoastEnemy(float deltaTime)
 {
 	const TerrainType terrain = GetRoadProfile(traveledDistance).terrain;
+	coastVisualHoldTimer = (std::max)(
+		0.0f, coastVisualHoldTimer - deltaTime);
 
 	// SHOT이 없는 채 구간을 통과했다면 다음 해안 구간을 기다립니다.
 	while (nextCoastEnemyZoneIndex < kEnemyZoneCount
@@ -668,6 +670,9 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 	if (coastEnemyWasActive && !hasActiveEnemy)
 	{
 		LogEvent("Enemy 제거됨 (격추 또는 소멸)");
+		// 배가 사라진 직후 지형이 한 프레임 만에 교체되지 않도록 해안을
+		// 잠시 더 유지한 뒤 원래 코스로 돌아갑니다.
+		coastVisualHoldTimer = 2.5f;
 	}
 	coastEnemyWasActive = hasActiveEnemy;
 
@@ -692,9 +697,13 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 			// 배경(DrawCoastRow)에 바다가 그려지는 쪽과 맞춰서 스폰합니다.
 			const EnemySide spawnSide = coastOceanOnRight[nextCoastEnemyZoneIndex]
 				? EnemySide::Right : EnemySide::Left;
+			heldCoastOceanOnRight = spawnSide == EnemySide::Right;
+			coastVisualHoldTimer = 0.0f;
 			coastEnemy = SpawnActor<Enemy>(initialDistance, spawnSide);
 			coastEnemyScreenX = spawnSide == EnemySide::Left
 				? screenWidth * 0.18f : screenWidth * 0.82f;
+			enemyFireTimer = 0.0f;
+			enemyFirePatternIndex = 0;
 			LogEvent("Enemy 출현 zone="
 				+ std::to_string(nextCoastEnemyZoneIndex)
 				+ " side=" + (spawnSide == EnemySide::Left ? "Left" : "Right"));
@@ -768,17 +777,22 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 	{
 		enemyFireTimer += deltaTime;
 		// 느린 예고탄, 한 번의 빠른 후속탄, 긴 휴식이 반복됩니다.
-		constexpr float fireIntervals[] = { 2.5f, 1.4f, 3.0f };
+		constexpr float earlyFireIntervals[] = { 3.8f, 3.2f, 4.2f };
+		constexpr float middleFireIntervals[] = { 3.0f, 2.1f, 3.4f };
+		constexpr float lateFireIntervals[] = { 2.4f, 1.5f, 2.8f };
 		constexpr int firePatternCount = 3;
 		// UpdateRunSpeed와 같은 방식으로 코스 진행률에 따라 발사 간격을
 		// 점점 줄여, 뒤쪽 해안 구간일수록 더 자주(연사에 가깝게) 쏘게 합니다.
-		constexpr float minIntervalScale = 0.4f;
-		const float courseProgress = std::clamp(
-			traveledDistance / courseDistance, 0.0f, 1.0f);
-		const float intervalScale =
-			1.0f - courseProgress * (1.0f - minIntervalScale);
-		const float fireInterval =
-			fireIntervals[enemyFirePatternIndex] * intervalScale;
+		const float* fireIntervals = earlyFireIntervals;
+		if (traveledDistance >= 3500.0f)
+		{
+			fireIntervals = lateFireIntervals;
+		}
+		else if (traveledDistance >= 2000.0f)
+		{
+			fireIntervals = middleFireIntervals;
+		}
+		const float fireInterval = fireIntervals[enemyFirePatternIndex];
 		if (enemyFireTimer >= fireInterval)
 		{
 			const Craft::Vector2 enemyPosition = coastEnemy->GetPosition();
@@ -928,7 +942,11 @@ void PolarLevel::CheckObstacleCollisions()
 		// Player::Draw()가 실제로 "(_____)"를 그리는 시작 X와 동일한 계산을
 		// 씁니다. 판정 코드가 따로 계산하면 나중에 Draw() 쪽 값만 바뀌었을
 		// 때 둘이 어긋날 수 있습니다.
-		const int playerBodyLeft = playerCollisionX + player->GetBodyLeftOffset();
+		// 점프 자세의 몸통("/( _ )\\")은 방향과 관계없이 x - 3에서
+		// 시작합니다. 미끄러지는 자세용 오프셋을 그대로 사용하면 왼쪽을
+		// 보며 점프할 때 히트박스가 화면보다 오른쪽으로 밀립니다.
+		const int playerBodyLeft = playerCollisionX
+			+ (player->IsJumping() ? -3 : player->GetBodyLeftOffset());
 		const int playerBodyRight = playerBodyLeft + (Player::BodyWidth - 1);
 		// IceWall의 외곽선("|")도 실제 벽으로 취급합니다. 플레이어 몸통의
 		// 괄호("("/")")가 외곽선에 닿는 순간부터 Crash입니다.
@@ -957,16 +975,12 @@ void PolarLevel::CheckObstacleCollisions()
 		// IceWall의 현재 화면상 몸통 범위와 플레이어의 실제 미끄러짐 몸통 줄을
 		// 직접 비교합니다. 이전~현재 프레임 전체를 넓게 합치면 커브에서 벽이
 		// 이미 옆으로 이동한 뒤에도 과거 Y 범위 때문에 오충돌이 발생합니다.
-		const int playerBodyTop = currentPlayerScreenY;
-		const int playerBodyBottom = currentPlayerScreenY;
-		const bool iceWallVerticalOverlap =
-			iceWallBounds.bottom >= playerBodyTop
-			&& iceWallBounds.top <= playerBodyBottom;
+		// 화면 Y는 거리 투영과 점프 높이가 섞인 시각 좌표입니다. IceWall의
+		// 높은 그림이 점프한 펭귄과 화면에서 겹쳐도 실제 진행 거리는 아직
+		// 멀 수 있으므로, 충돌 시점은 장애물의 기준 행이 플레이어 진행선을
+		// 통과했는지로 판정합니다.
 		const bool reachesPlayer = isBrokenBridge
-			? crossedBridgeEntry
-			: (obstacleType == ObstacleType::IceWall
-				? iceWallVerticalOverlap
-				: crossedPlayerRow);
+			? crossedBridgeEntry : crossedPlayerRow;
 		const bool clearedLowSpike =
 			obstacleType == ObstacleType::LowSpike
 			&& player->IsAboveObstacle();
@@ -995,16 +1009,7 @@ void PolarLevel::CheckObstacleCollisions()
 			LogEvent(crashEntry.str());
 			return;
 		}
-		// IceWall의 실제 몸통 위쪽까지 플레이어 줄 아래로 지나간 뒤 검사 완료로
-		// 바꿉니다. 따라서 화면에 남아 있는 몸통 줄은 계속 충돌할 수 있습니다.
-		if (obstacleType == ObstacleType::IceWall)
-		{
-			if (iceWallBounds.top > playerBodyBottom)
-			{
-				obstacle->MarkChecked();
-			}
-		}
-		else if ((!isBrokenBridge && obstacleScreenY > currentPlayerScreenY)
+		if ((!isBrokenBridge && obstacleScreenY > currentPlayerScreenY)
 			|| (isBrokenBridge && contactScreenY > currentPlayerScreenY))
 		{
 			obstacle->MarkChecked();
@@ -1380,7 +1385,9 @@ void PolarLevel::DrawPerspectiveRoad()
 {
 	const int roadTopY = horizonY + 1;
 	const int roadBottomY = screenHeight - 1;
-	const bool keepCoastVisible = coastEnemy && !coastEnemy->HasExpired();
+	const bool keepCoastVisible =
+		(coastEnemy && !coastEnemy->HasExpired())
+		|| coastVisualHoldTimer > 0.0f;
 
 	for (int y = roadTopY; y <= roadBottomY; ++y)
 	{
@@ -1452,10 +1459,11 @@ void PolarLevel::DrawCoastRow(int y, float depth, const RoadSlice& slice)
 	// Enemy 구간 안이면 그 구간에서 정해둔 바다 방향을 따라가고,
 	// 그 외 해안 구간은 기존처럼 왼쪽에 바다를 둡니다.
 	bool oceanOnRight = false;
-	if (coastEnemy && !coastEnemy->HasExpired())
+	if ((coastEnemy && !coastEnemy->HasExpired())
+		|| coastVisualHoldTimer > 0.0f)
 	{
 		// 추격 중에는 처음 등장했던 바다 방향을 그대로 유지합니다.
-		oceanOnRight = coastEnemy->GetSide() == EnemySide::Right;
+		oceanOnRight = heldCoastOceanOnRight;
 	}
 	else for (int zoneIndex = 0; zoneIndex < kEnemyZoneCount; ++zoneIndex)
 	{

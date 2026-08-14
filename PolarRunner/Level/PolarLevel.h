@@ -156,5 +156,7 @@ private:
 	float coastEnemyScreenX = 0.0f;
 	int enemyFirePatternIndex = 0;
 	bool coastEnemyWasActive = false;
+	float coastVisualHoldTimer = 0.0f;
+	bool heldCoastOceanOnRight = false;
 	float nextBalanceLogDistance = 100.0f;
 };

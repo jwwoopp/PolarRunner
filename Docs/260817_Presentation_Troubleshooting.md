@@ -19,7 +19,31 @@
 
 전체를 관통하는 한 문장:
 
-> **"보이는 것(Draw)과 판정하는 것(Collision)이 서로 다른 계산을 하면 반드시 어긋난다."**
+> **"같은 것을 두 번 표현하면, 두 표현은 반드시 어긋난다."**
+
+### 세 문제의 공통 구조
+
+```text
+01 IceWall        화면에 그린 위치  ≠  충돌 판정 위치
+                          ▼
+                  좌표 계산을 한 곳으로 통합 (Draw = 판정)
+                  단, 규칙(점프 높이)은 논리값으로 분리
+
+02 Perspective    월드 거리        ≠  화면 위치
+                          ▼
+                  World → Screen 단방향 변환
+                  역변환 왕복은 정수 행에서 깨진다
+
+03 Shooting       현재 위치만으로는 부족
+                          ▼
+                  Previous + Current 스윕 상태
+                  스폰 첫 프레임의 "이전 위치"까지 정의해야 한다
+```
+
+> ※ 1번을 "렌더링과 로직의 분리"로 요약하면 실제 수정과 어긋납니다. 벽의 폭은
+> 거리에 따라 달라지는 **화면상의 값**이라 논리 좌표로 떼어낼 수 없었고, 해결은
+> `Draw()`와 판정이 같은 계산을 공유하도록 **통합**하는 것이었습니다.
+> 분리한 것은 좌표가 아니라 **규칙**입니다(점프 높이 = 논리값, 출력 = 화면값).
 
 ---
 
@@ -405,3 +429,153 @@ newPosition.x = static_cast<int>(xPosition) - GetWidth() / 2;
 
 - Visual Studio MSBuild `Debug|x64` 빌드 성공 (경고 0, 오류 0)
 - 각 수정은 판정 위치와 난이도 수치를 동시에 바꾸지 않고 분리해 검증
+
+---
+
+## 부록. 예상 C++ 질의응답
+
+발표 후 나올 가능성이 높은 순으로 정리했습니다. ★는 특히 자주 나오는 항목입니다.
+
+### A. 메모리와 소유권
+
+**★ Q. 왜 `shared_ptr`인가요? `unique_ptr`이나 raw 포인터는 안 되나요?**
+Actor의 수명을 소유하는 것은 `Level::actorList`지만, 게임 코드도 같은 객체를 계속
+참조합니다(`coastEnemy`, `obstacles`, `enemyBullets`). 소유자가 하나면 `unique_ptr`이
+맞지만 참조 지점이 여러 곳이라 `shared_ptr`을 썼습니다. 반대로 Actor → Level 방향은
+소유가 아니므로 `weak_ptr`입니다.
+
+**★ Q. Actor가 Level을 `weak_ptr`로 가진 이유는?**
+Level이 Actor를 `shared_ptr`로 잡고 있는데 Actor도 Level을 `shared_ptr`로 잡으면
+**순환 참조**가 되어 참조 카운트가 0이 되지 않습니다. `weak_ptr`은 카운트를 올리지
+않고, 사용할 때 `lock()`으로 유효성을 확인합니다. 코드의 `GetOwner()`가
+`owner.lock()`입니다.
+
+**Q. `enable_shared_from_this`는 왜 필요한가요?**
+`SpawnActor()`에서 새 Actor에게 소유자를 알려주려면 Level 자신의 `weak_ptr`이
+필요합니다. `this`로 `shared_ptr`을 새로 만들면 제어 블록이 두 개가 되어 이중 해제가
+발생합니다. 그래서 `weak_from_this()`를 씁니다.
+
+**★ Q. `Destroy()`가 즉시 삭제하지 않고 플래그만 세우는 이유는?**
+순회 도중 컨테이너를 수정하면 이터레이터가 무효화되고, 충돌 처리 중이라면 상대 Actor가
+사라져 댕글링이 됩니다. `hasExpired` 플래그만 세운 뒤 프레임 끝의
+`ProcessAddAndDestroyActors()`에서 한 번에 정리합니다. 추가도 같은 이유로
+`addRequestedActorList`에 모았다가 처리합니다.
+→ 3번 챕터의 "Enemy가 제거되는 그 프레임"에 지형이 한 프레임 깜빡이던 문제가 바로 이
+지연 삭제 타이밍에서 나왔습니다.
+
+**Q. `iterator = actorList.erase(iterator)` 형태인 이유는?**
+`erase`는 지운 자리의 다음 유효 이터레이터를 반환합니다. 그대로 `++iterator`를 하면
+무효화된 이터레이터를 증가시켜 정의되지 않은 동작입니다.
+
+### B. 타입 시스템과 캐스팅
+
+**★ Q. `TYPE_DECLARATIONS` 매크로는 무엇을 하나요?**
+함수 안 `static int` 변수의 **주소**를 타입 ID로 사용합니다. 타입마다 주소가 유일하므로
+정수 비교만으로 타입을 판별할 수 있고, `Is()`가 부모 타입으로 재귀해 상속 관계까지
+확인합니다. RTTI를 꺼도 동작하고 `dynamic_cast`보다 비용이 훨씬 쌉니다.
+
+**Q. 그런데 게임 코드는 매 프레임 `std::dynamic_pointer_cast`를 쓰던데요?** *(약점 질문)*
+맞습니다. 엔진에는 가벼운 `Craft::Cast<T>()`(타입 ID 확인 후 `static_pointer_cast`)가
+있는데 PolarRunner 쪽은 표준 `dynamic_pointer_cast`를 쓰고 있습니다.
+`PolarObstacle::Tick()`/`Draw()`가 매 프레임 레벨을 캐스팅하므로, 소유 레벨 포인터를
+한 번만 캐스팅해 캐시하거나 `Cast<T>()`로 교체하는 것이 남은 개선 지점입니다.
+
+**Q. `using super = ParentType;`는 왜 두었나요?**
+부모 구현을 부를 때 `Actor::Tick` 대신 `super::Tick`으로 쓸 수 있어 상속 구조가 바뀌어도
+호출부를 고치지 않습니다. 단일 상속을 전제로 한 장치입니다.
+
+### C. 템플릿
+
+**★ Q. `SpawnActor`의 템플릿 선언을 설명해 주세요.**
+
+```cpp
+template<typename T, typename ...Args,
+    typename = std::enable_if_t<std::is_base_of<Actor, T>::value>>
+std::shared_ptr<T> SpawnActor(Args&& ...args)
+{
+    std::shared_ptr<T> newActor = std::make_shared<T>(std::forward<Args>(args)...);
+    ...
+}
+```
+
+가변 인자 템플릿으로 어떤 생성자 인자든 받고, `std::forward`로 **완벽 전달**해 불필요한
+복사를 없앱니다. 마지막 기본 템플릿 인자는 SFINAE로 **Actor 파생 클래스만** 허용하는
+장치입니다. C++20이라면 `requires std::derived_from<T, Actor>`로 더 읽기 쉽게 쓸 수
+있습니다.
+
+**Q. `std::forward`와 `std::move`의 차이는?**
+`std::move`는 무조건 우값으로 캐스팅하고, `std::forward<T>`는 **원래 값 범주를 그대로
+유지**합니다. `Args&&`는 우값 참조가 아니라 전달 참조(forwarding reference)이므로
+`forward`를 써야 좌값이 좌값으로 넘어갑니다.
+
+### D. 문법 디테일
+
+**★ Q. `(std::min)(a, b)`처럼 괄호로 감싼 이유는?**
+`<Windows.h>`가 `min`/`max`를 **매크로**로 정의합니다. 함수형 매크로는 이름 바로 뒤에
+`(`가 와야 확장되므로 괄호로 감싸면 확장을 막을 수 있습니다. 근본 해법은 Windows.h보다
+먼저 `#define NOMINMAX`를 두는 것입니다. 현재 `PolarLevel.cpp`에 이 패턴이 15군데
+있습니다.
+
+**Q. `static constexpr int BodyWidth = 7;`이 클래스 안에서 초기화되나요?**
+`constexpr` 정적 멤버라 클래스 내 초기화가 가능하고, C++17부터는 암묵적으로 `inline`
+변수라 .cpp에 별도 정의를 두지 않아도 ODR 위반이 없습니다.
+`inline static float nextStartDistance = 0.0f;`도 같은 C++17 기능입니다.
+
+**★ Q. `void (PolarLevel::*leftFill)(int, int, int)` 이 문법은 무엇인가요?**
+**멤버 함수 포인터**입니다. 6개 지형 렌더 함수의 중복을 없애려고 `DrawRoadEdges()`
+골격에 "좌우를 무엇으로 채울지"를 함수로 넘깁니다. 호출은
+`(this->*leftFill)(y, 0, leftX - 1)`처럼 `->*` 연산자를 씁니다. 넘길 대상이 전부 같은
+클래스의 멤버라, `std::function`보다 가벼운(힙 할당·타입 소거 없는) 이 방식을
+골랐습니다.
+
+**Q. 그럼 `DrawTerrainFill`은 왜 `std::function`인가요?**
+거기에는 캡처가 있는 람다를 넘기기 때문입니다. 대신 칸마다 간접 호출이 생겨 인라인이
+되지 않으므로, 성능이 문제가 되면 템플릿 파라미터로 받아 인라인시키는 것이 정석입니다.
+
+**★ Q. `static_cast<int>`는 반올림이 아니라 절단인데 괜찮나요?**
+0 방향 절단입니다. 거리를 양수 구간으로 clamp해 두어 `floor`와 결과는 같지만,
+**정수로 잘린다는 사실 자체가 2번 챕터 문제의 원인**이었습니다. 그래서 화면 Y를 거리로
+되돌리는 역변환을 신뢰하지 않고 "그 행을 지났는가"로 판정을 바꿨습니다.
+
+**Q. `horizontalPosition == horizontalMin` — 부동소수를 `==`로 비교해도 되나요?**
+일반적으로는 안 됩니다. 여기서는 바로 윗줄의 `std::clamp`가 그 값을 **그대로 대입**했기
+때문에 비트 패턴이 동일해 안전합니다. 계산 결과끼리 비교하는 자리였다면 엡실론 비교를
+썼을 것입니다.
+
+**Q. `enum class`를 쓴 이유는?**
+`EnemyState::Chasing`처럼 스코프가 생기고 정수로 암묵 변환되지 않아, `ObstacleType`과
+`EnemySide` 같은 열거형을 실수로 섞어 쓰는 것을 컴파일 단계에서 막습니다.
+
+**Q. 익명 `namespace { constexpr float kLaneOffsets[] ... }`는 왜인가요?**
+내부 링키지를 부여해 다른 번역 단위와 이름이 충돌하지 않게 합니다. 파일 스코프 `static`의
+현대적 대체입니다. 장애물 생성과 Enemy 구간 판정이 **같은 상수**를 보게 하려고 한곳에
+모았습니다.
+
+**Q. `std::vector<bool> coastOceanOnRight`는 문제가 없나요?**
+`std::vector<bool>`은 비트를 압축하는 표준 특수화라 `bool&`를 돌려주지 않습니다. 여기서는
+인덱스로 읽기만 해서 문제가 없지만, 원소의 참조를 잡아야 한다면 `std::vector<char>`나
+`std::deque<bool>`을 써야 합니다.
+
+**Q. 범위 기반 for에서 `const std::shared_ptr<T>&`로 받는 이유는?**
+값으로 받으면 반복마다 참조 카운트가 원자적으로 증감합니다. 소유권을 늘릴 이유가 없으므로
+const 참조로 받습니다.
+
+**Q. 가상 소멸자는 왜 필요한가요?**
+기반 클래스 포인터로 파생 객체를 삭제할 때 파생 소멸자가 호출되도록 하기 위해서입니다
+(`CraftObject`의 `virtual ~CraftObject() = default;`).
+참고로 `make_shared<Derived>()`로 만든 `shared_ptr`은 삭제자가 실제 타입을 기억하므로
+이 경우에는 안전하지만, 다형적 기반 클래스에 가상 소멸자를 두는 것은 원칙입니다.
+
+### E. 약점을 찌르는 질문 대비
+
+솔직하게 인정하고 대안을 말하는 편이 낫습니다.
+
+| 예상 지적 | 준비된 답 |
+| --- | --- |
+| 매 프레임 `dynamic_pointer_cast` | 인지하고 있고, 엔진의 `Cast<T>()`로 교체하거나 레벨 포인터를 캐시하면 해결됩니다. |
+| 충돌이 O(n²) 전수 비교 | `CollisionSystem::ProcessCollision()`이 이중 루프입니다. 동시 액터가 수십 개 수준이라 실측 문제는 없었지만, 늘어나면 공간 분할이 정석입니다. |
+| 판정이 화면 좌표에 묶여 있다 | 의도적인 트레이드오프입니다. 점프 높이 같은 **규칙**은 논리값으로 분리했지만, 벽의 폭은 거리에 따라 그림이 바뀌는 값이라 화면 기준이 아니면 "보이는 것과 판정"을 맞출 수 없었습니다. 콘솔 크기를 바꾸면 재조정이 필요합니다. |
+| `PolarLevel.cpp`가 1,900줄 | 한 차례 `PolarLevel_Draw.cpp`로 렌더 함수를 분리했다가 현재는 다시 합쳐진 상태입니다. 재분리가 남은 과제입니다. |
+
+**답변 원칙**: 모르는 질문은 추측하지 말고 "그 부분은 확인해서 알려드리겠습니다"와 함께
+해당 코드 위치(파일·함수명)를 짚어주면 신뢰가 유지됩니다.

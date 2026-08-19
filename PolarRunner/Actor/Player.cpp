@@ -1,4 +1,4 @@
-#include "Player.h"
+﻿#include "Player.h"
 
 #include <Engine/Engine.h>
 #include <Input/Input.h>
@@ -77,6 +77,7 @@ void Player::Tick(float deltaTime)
 		{
 			isJumping = true;
 			jumpTimer = 0.0f;
+			Craft::Engine::Get().PlayOneShot("jump01.wav");
 		}
 		else
 		{
@@ -93,6 +94,7 @@ void Player::Tick(float deltaTime)
 			{
 				jumpTimer = 0.0f;
 				jumpInputBufferRemaining = 0.0f;
+				Craft::Engine::Get().PlayOneShot("jump02.wav");
 			}
 			else
 			{

@@ -58,12 +58,14 @@
       <PreprocessorDefinitions>ENGINE_BUILD_DLL;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)\;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\;..\Includes\SoundSystem;</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>..\Library\SoundSystem\$(Configuration)\;</AdditionalLibraryDirectories>
+      <AdditionalDependencies>SoundSystem.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
@@ -76,7 +78,8 @@
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>xcopy *.h ..\Includes\ /e /y /i
-xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i</Command>
+xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i
+xcopy ..\Assets\* $(OutDir)..\Assets\ /e /y /i</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -88,12 +91,14 @@ xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i</Command>
       <PreprocessorDefinitions>ENGINE_BUILD_DLL;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)\;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\;..\Includes\SoundSystem;</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>..\Library\SoundSystem\$(Configuration)\;</AdditionalLibraryDirectories>
+      <AdditionalDependencies>SoundSystem.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
@@ -106,7 +111,8 @@ xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>xcopy *.h ..\Includes\ /e /y /i
-xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i</Command>
+xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i
+xcopy ..\Assets\* $(OutDir)..\Assets\ /e /y /i</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -133,6 +139,11 @@ xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i</Command>
     <ClInclude Include="Render\Renderer.h" />
     <ClInclude Include="Render\ScreenBuffer.h" />
     <ClInclude Include="Util\Util.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SoundSystem\SoundSystem.vcxproj">
+      <Project>{e7765373-c49d-4175-86b4-5f65d5d2def8}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

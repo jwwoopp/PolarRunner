@@ -754,6 +754,7 @@ void PolarLevel::UpdateCoastEnemy(float deltaTime)
 	{
 		if (coastEnemyWarningTimer <= 0.0f)
 		{
+			Craft::Engine::Get().PlayOneShot("alarm.wav");
 			LogEvent("Enemy 경고 시작 zone="
 				+ std::to_string(nextCoastEnemyZoneIndex));
 		}
@@ -922,6 +923,7 @@ void PolarLevel::HandlePlayerFire()
 	const int direction = player->IsFacingRight() ? 1 : -1;
 	const int bulletStartX = playerX + direction * 5;
 	SpawnActor<PlayerBullet>(Craft::Vector2(bulletStartX, playerY - 1), direction);
+	Craft::Engine::Get().PlayOneShot("Laser_Shoot.wav");
 
 	--nonShotCount;
 
@@ -965,6 +967,7 @@ void PolarLevel::CheckStarCollections()
 		if (overlapsPlayerBody && horizontalOverlap)
 		{
 			star->Collect();
+			Craft::Engine::Get().PlayOneShot("star.wav");
 			++collectedStarCount;
 			if (collectedStarCount >= RequiredStarCount)
 			{
@@ -1111,6 +1114,7 @@ void PolarLevel::CheckObstacleCollisions()
 			crashedObstacleType = obstacle->GetObstacleType();
 			fellThroughBrokenBridge = isBrokenBridge;
 			state = State::Crashed;
+			Craft::Engine::Get().PlayOneShot("gameover.wav");
 			std::ostringstream crashEntry;
 			crashEntry << "CRASH: " << GetObstacleName(crashedObstacleType)
 				<< " speed=" << runSpeed;
@@ -1183,6 +1187,7 @@ void PolarLevel::CheckEnemyBulletCollisions()
 				bullet->Destroy();
 				hitByEnemyBullet = true;
 				state = State::Crashed;
+				Craft::Engine::Get().PlayOneShot("gameover.wav");
 				LogEvent("CRASH: Enemy 탄환 피격 speed="
 					+ std::to_string(runSpeed));
 				return;
@@ -1220,6 +1225,7 @@ void PolarLevel::CheckTerrainHazards(float deltaTime)
 		{
 			fellFromNarrowIcePath = true;
 			state = State::Crashed;
+			Craft::Engine::Get().PlayOneShot("gameover.wav");
 			LogEvent("CRASH: 좁은 얼음길 추락 speed="
 				+ std::to_string(runSpeed));
 		}

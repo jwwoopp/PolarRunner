@@ -37,6 +37,8 @@ inline std::unordered_map<std::string, Variable> variableMap;
 inline std::vector<Variable> variableList;
 
 
+class Sound;
+
 // CraftEngine 프로젝트 안의 클래스는 Craft 네임 스페이스 사용.
 namespace Craft
 {
@@ -45,6 +47,7 @@ namespace Craft
 	class Input;
 	class Renderer;
 	class CollisionSystem;
+
 
 	// 메인 엔진 클래스.
 	// 엔진 루프를 제공.
@@ -75,6 +78,11 @@ namespace Craft
 
 		// 엔진 종료 함수.
 		void Quit();
+
+		// 사운드 재생 함수(사운드 시스템 레퍼 함수).
+		void PlayOneShot(const std::string& filename);
+		void PlayBGM(const std::string& filename, bool loop);
+		void StopBGM();
 
 		// 레벨 추가 요청 함수.
 		// 1. std::is_based_of 하는 일이 무엇인지
@@ -178,6 +186,9 @@ namespace Craft
 
 		// 콜리전 시스템.
 		std::unique_ptr<CollisionSystem> collisionSystem;
+
+		// 사운드 시스템 객체.
+		std::unique_ptr<Sound> sound;
 	};
 }
 

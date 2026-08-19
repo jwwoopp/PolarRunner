@@ -4,6 +4,7 @@
 int main()
 {
 	Craft::Engine engine;
+	engine.PlayBGM("main.wav", true);
 	engine.AddNewLevel<TitleLevel>();
 	engine.Run();
 	return 0;

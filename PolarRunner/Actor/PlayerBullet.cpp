@@ -15,6 +15,9 @@ void PlayerBullet::OnCollision(const std::shared_ptr<Craft::Actor>& other)
 {
 	if (std::dynamic_pointer_cast<Enemy>(other))
 	{
+		// 폭발 사운드 재생.
+		Engine::Get().PlayOneShot("Explosion.wav");
+
 		other->Destroy();
 		Destroy();
 	}

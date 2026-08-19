@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <Actor/Actor.h>
 #include <Game/ObstacleType.h>

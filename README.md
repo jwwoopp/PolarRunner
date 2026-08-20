@@ -216,3 +216,12 @@ ApproachingDepth  →  ClosingSide  →  Chasing
 `(0, 0)`에서 스폰 좌표까지 이어지는 거대한 swept 선분이 화면을 가로지른
 것이 원인이었습니다. 생성자 초기화 리스트에 `previousPosition(position)`을
 추가해 해결했습니다.
+
+## 도구
+
+| 도구 | 내용 |
+|---|---|
+| [CodeStateViewer](Tools/CodeStateViewer/) | C++과 파이썬을 한 줄씩 나란히 실행하며, 그 시점에 이름이 존재하는지와 값이 무엇인지를 디버거처럼 보여주는 학습용 페이지. `Tools/CodeStateViewer/index.html` 을 브라우저로 열면 됩니다 |
+
+위 `previousPosition` 사례처럼 "초기화하지 않은 값이 어떻게 보이는지"를
+직접 단계별로 확인해 볼 수 있습니다.

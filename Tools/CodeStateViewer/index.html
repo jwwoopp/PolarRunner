@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이름이 생기는 순간</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* ============================================================
+   토큰 — 밝은 화면이 기본, 어두운 화면은 토큰만 다시 정의한다
+   ============================================================ */
+:root {
+  --ground:        #E9EEF2;
+  --surface:       #FFFFFF;
+  --surface-2:     #F4F7FA;
+  --surface-3:     #EAEFF4;
+  --ink:           #0E1920;
+  --ink-2:         #33454F;
+  --muted:         #5E717D;
+  --faint:         #8A9AA5;
+  --rule:          #D2DCE3;
+  --rule-strong:   #B9C7D1;
+
+  --point:         #B36A0C;   /* 실행 포인터 — 이 페이지의 유일한 강조색 */
+  --point-ink:     #7A4705;
+  --point-soft:    #FBF1DE;
+  --point-line:    #E8C58A;
+  --on-point:      #FFFFFF;
+
+  --bad:           #A82A1E;
+  --bad-soft:      #FBEAE7;
+  --bad-line:      #EBB6AE;
+  --good:          #13705A;
+  --good-soft:     #E3F2ED;
+
+  --kw:            #1F4FA8;
+  --str:           #0F6E4C;
+  --num:           #8A4B12;
+  --cmt:           #7C8B95;
+
+  --shadow:        0 1px 2px rgba(14,25,32,.06), 0 8px 24px -14px rgba(14,25,32,.28);
+  --radius:        10px;
+
+  --sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", "D2Coding", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #0C1319;
+    --surface:     #141D25;
+    --surface-2:   #0F1820;
+    --surface-3:   #1B262F;
+    --ink:         #E4EDF3;
+    --ink-2:       #C2D0DA;
+    --muted:       #93A5B1;
+    --faint:       #6C7E8B;
+    --rule:        #24323C;
+    --rule-strong: #354855;
+
+    --point:       #EFA94E;
+    --point-ink:   #F6C88A;
+    --point-soft:  #2A2113;
+    --point-line:  #6B5124;
+    --on-point:    #17120A;
+
+    --bad:         #F0796A;
+    --bad-soft:    #2C1815;
+    --bad-line:    #6E3229;
+    --good:        #4FC6A0;
+    --good-soft:   #12261F;
+
+    --kw:          #86AEF5;
+    --str:         #6FCBA0;
+    --num:         #E4A66B;
+    --cmt:         #6D7E8A;
+
+    --shadow:      0 1px 2px rgba(0,0,0,.5), 0 10px 28px -16px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"] {
+  --ground:      #0C1319;
+  --surface:     #141D25;
+  --surface-2:   #0F1820;
+  --surface-3:   #1B262F;
+  --ink:         #E4EDF3;
+  --ink-2:       #C2D0DA;
+  --muted:       #93A5B1;
+  --faint:       #6C7E8B;
+  --rule:        #24323C;
+  --rule-strong: #354855;
+  --point:       #EFA94E;
+  --point-ink:   #F6C88A;
+  --point-soft:  #2A2113;
+  --point-line:  #6B5124;
+  --on-point:    #17120A;
+  --bad:         #F0796A;
+  --bad-soft:    #2C1815;
+  --bad-line:    #6E3229;
+  --good:        #4FC6A0;
+  --good-soft:   #12261F;
+  --kw:          #86AEF5;
+  --str:         #6FCBA0;
+  --num:         #E4A66B;
+  --cmt:         #6D7E8A;
+  --shadow:      0 1px 2px rgba(0,0,0,.5), 0 10px 28px -16px rgba(0,0,0,.8);
+}
+
+/* ============================================================
+   기본
+   ============================================================ */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1360px; margin: 0 auto; padding: 28px 20px 72px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--point); outline-offset: 2px; border-radius: 4px; }
+
+/* ============================================================
+   헤더
+   ============================================================ */
+.top { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: flex-end; justify-content: space-between; padding-bottom: 20px; border-bottom: 1px solid var(--rule); }
+.eyebrow {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  letter-spacing: .22em; text-transform: uppercase; color: var(--faint);
+  display: block; margin-bottom: 8px;
+}
+.top h1 { font-size: clamp(26px, 3.4vw, 38px); font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+.top .tagline { margin: 10px 0 0; color: var(--muted); max-width: 62ch; font-size: 14.5px; }
+.top .tagline b { color: var(--ink-2); font-weight: 600; }
+.theme-btn {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 999px;
+  padding: 7px 14px; font-size: 12.5px; color: var(--muted); cursor: pointer;
+  font-family: var(--mono); letter-spacing: .04em;
+}
+.theme-btn:hover { border-color: var(--rule-strong); color: var(--ink); }
+
+/* ============================================================
+   시나리오 탭
+   ============================================================ */
+.scenario { margin-top: 24px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab {
+  background: transparent; border: 1px solid transparent; border-radius: 999px;
+  padding: 7px 15px; font-size: 13.5px; color: var(--muted); cursor: pointer; white-space: nowrap;
+}
+.tab:hover { color: var(--ink); background: var(--surface-3); }
+.tab[aria-selected="true"] { background: var(--surface); border-color: var(--rule-strong); color: var(--ink); font-weight: 600; box-shadow: var(--shadow); }
+.tab.custom { font-family: var(--mono); font-size: 12.5px; }
+
+.brief {
+  margin-top: 14px; background: var(--surface); border: 1px solid var(--rule);
+  border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow);
+  display: grid; gap: 6px;
+}
+.brief h2 { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+.brief .lede { color: var(--muted); font-size: 14px; }
+.brief .point { margin: 6px 0 0; color: var(--ink-2); font-size: 14px; border-top: 1px dashed var(--rule); padding-top: 12px; }
+
+/* ============================================================
+   진행 컨트롤
+   ============================================================ */
+.transport {
+  position: sticky; top: 0; z-index: 20; margin: 18px 0 0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius);
+  padding: 10px 14px; box-shadow: var(--shadow);
+}
+.btn {
+  background: var(--surface-2); border: 1px solid var(--rule-strong); border-radius: 8px;
+  padding: 8px 14px; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--ink-2);
+  transition: background .12s ease, border-color .12s ease, transform .06s ease;
+}
+.btn:hover:not(:disabled) { background: var(--surface-3); color: var(--ink); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary {
+  background: var(--point); border-color: var(--point); color: var(--on-point);
+  font-weight: 600; padding: 8px 22px;
+}
+.btn.primary:hover:not(:disabled) { filter: brightness(1.06); }
+.transport .spacer { flex: 1 1 auto; }
+.transport .hint { font-size: 12.5px; color: var(--faint); font-family: var(--mono); }
+.kbd {
+  font-family: var(--mono); font-size: 11px; border: 1px solid var(--rule-strong);
+  border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--muted); background: var(--surface-2);
+}
+
+/* ============================================================
+   레인
+   ============================================================ */
+.lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; align-items: stretch; }
+.lane {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius);
+  box-shadow: var(--shadow); overflow: hidden; display: grid; gap: 0;
+  grid-template-rows: auto auto auto auto auto auto 1fr;
+}
+.lane-head {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+  border-bottom: 1px solid var(--rule); background: var(--surface-2);
+}
+.chip-lang {
+  font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: .06em;
+  padding: 3px 9px; border-radius: 6px; border: 1px solid var(--rule-strong); color: var(--ink-2);
+  background: var(--surface);
+}
+.lane-status { font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+.lane-status.ok { color: var(--good); }
+.lane-status.bad { color: var(--bad); }
+.lane-head .grow { flex: 1 1 auto; }
+.mini {
+  background: transparent; border: 1px solid var(--rule); border-radius: 7px;
+  width: 30px; height: 28px; cursor: pointer; color: var(--muted); font-size: 15px; line-height: 1;
+}
+.mini:hover:not(:disabled) { background: var(--surface-3); color: var(--ink); }
+.mini:disabled { opacity: .35; cursor: not-allowed; }
+.mini.wide { width: auto; padding: 0 10px; font-size: 12.5px; font-family: var(--sans); }
+.counter { font-family: var(--mono); font-size: 12px; color: var(--faint); min-width: 58px; text-align: center; font-variant-numeric: tabular-nums; }
+
+/* 진행 막대 */
+.progress { height: 2px; background: var(--surface-3); }
+.progress > i { display: block; height: 100%; background: var(--point); transition: width .18s ease; }
+
+/* 코드 */
+.code {
+  font-family: var(--mono); font-size: 13.2px; line-height: 1.75;
+  background: var(--surface-2); min-height: 300px; max-height: 44vh; overflow: auto; padding: 10px 0;
+  border-bottom: 1px solid var(--rule); tab-size: 4;
+}
+.ln { display: grid; grid-template-columns: 44px 16px 1fr; align-items: baseline; padding: 0 12px 0 0; white-space: pre; }
+.ln .num { color: var(--faint); text-align: right; padding-right: 10px; font-size: 12px; font-variant-numeric: tabular-nums; user-select: none; }
+.ln .ptr { color: transparent; font-size: 11px; user-select: none; }
+.ln code { font: inherit; }
+.ln.current { background: var(--point-soft); box-shadow: inset 3px 0 0 var(--point); }
+.ln.current .ptr { color: var(--point); }
+.ln.current .num { color: var(--point-ink); font-weight: 600; }
+.ln.errline { background: var(--bad-soft); box-shadow: inset 3px 0 0 var(--bad); }
+.ln.errline .num { color: var(--bad); font-weight: 600; }
+.ln.errline code { text-decoration: underline wavy var(--bad); text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.ln.done .num { color: var(--muted); }
+.tk-kw { color: var(--kw); }
+.tk-str { color: var(--str); }
+.tk-num { color: var(--num); }
+.tk-cmt { color: var(--cmt); font-style: italic; }
+.tk-pre { color: var(--muted); }
+.tk-fn { color: var(--ink); font-weight: 600; }
+
+.editor {
+  width: 100%; min-height: 320px; border: 0; border-bottom: 1px solid var(--rule);
+  background: var(--surface-2); color: var(--ink); font-family: var(--mono);
+  font-size: 13.2px; line-height: 1.75; padding: 12px 14px; resize: vertical; tab-size: 4;
+}
+.editor:focus { outline: 2px solid var(--point); outline-offset: -2px; }
+.hidden { display: none !important; }
+
+/* 설명 */
+.explain { padding: 13px 16px; border-bottom: 1px solid var(--rule); display: grid; gap: 9px; min-height: 72px; }
+.explain .note { font-size: 14.5px; font-weight: 600; display: flex; gap: 9px; align-items: baseline; }
+.explain .note .marker {
+  font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .04em;
+  color: var(--point-ink); background: var(--point-soft); border: 1px solid var(--point-line);
+  padding: 1px 7px; border-radius: 5px; white-space: nowrap;
+}
+.explain .note .marker.endmark { color: var(--muted); background: var(--surface-3); border-color: var(--rule); }
+.insight {
+  font-size: 13.5px; color: var(--ink-2); background: var(--point-soft);
+  border-left: 3px solid var(--point); border-radius: 0 7px 7px 0; padding: 9px 13px;
+}
+.errbox {
+  font-size: 13.5px; color: var(--ink-2); background: var(--bad-soft);
+  border-left: 3px solid var(--bad); border-radius: 0 7px 7px 0; padding: 9px 13px;
+}
+.errbox .errcode { font-family: var(--mono); font-weight: 600; color: var(--bad); display: block; margin-bottom: 3px; font-size: 12.5px; }
+.errbox .errcode + span { display: block; }
+
+/* 컴파일 오류 배너 */
+.banner { padding: 14px 16px; border-bottom: 1px solid var(--rule); background: var(--bad-soft); }
+.banner h3 { font-size: 14px; color: var(--bad); font-family: var(--mono); letter-spacing: .02em; margin-bottom: 6px; }
+.banner ul { margin: 0; padding-left: 18px; font-size: 13.5px; color: var(--ink-2); }
+.banner li { margin: 2px 0; }
+.banner li b { font-family: var(--mono); font-weight: 600; }
+.banner .why { margin: 9px 0 0; font-size: 13.5px; color: var(--ink-2); }
+
+/* 상태 패널 */
+.panel { padding: 13px 16px; border-bottom: 1px solid var(--rule); }
+.panel:last-child { border-bottom: 0; }
+.panel-title {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--faint); margin-bottom: 9px;
+}
+.frame { margin-bottom: 12px; }
+.frame:last-child { margin-bottom: 0; }
+.frame-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.frame-name { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.frame-tag {
+  font-size: 10.5px; font-family: var(--mono); letter-spacing: .08em; padding: 1px 6px;
+  border-radius: 4px; background: var(--point-soft); color: var(--point-ink); border: 1px solid var(--point-line);
+}
+.vars { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; }
+.vrow {
+  display: grid; grid-template-columns: minmax(0,1.1fr) minmax(0,1.4fr) auto;
+  gap: 10px; align-items: baseline; background: var(--surface); padding: 6px 10px;
+}
+.vrow.head { background: var(--surface-2); }
+.vrow.head span { font-size: 10.5px; font-family: var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+.v-name { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.v-val { font-family: var(--mono); font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.v-type { font-family: var(--mono); font-size: 11.5px; color: var(--faint); text-align: right; white-space: nowrap; }
+.vrow.changed { background: var(--point-soft); }
+.vrow.changed .v-val { color: var(--point-ink); font-weight: 600; }
+.vrow.garbage .v-val { color: var(--bad); }
+.tagpill {
+  font-size: 10.5px; font-family: var(--sans); margin-left: 6px; padding: 0 6px;
+  border-radius: 4px; border: 1px solid var(--bad-line); color: var(--bad); background: var(--bad-soft);
+  white-space: nowrap;
+}
+.tagpill.param { border-color: var(--rule-strong); color: var(--muted); background: var(--surface-2); }
+.tagpill.blk { border-color: var(--rule-strong); color: var(--muted); background: var(--surface-2); }
+.empty { font-size: 13px; color: var(--faint); padding: 8px 10px; background: var(--surface); }
+
+/* 출력 */
+.console {
+  font-family: var(--mono); font-size: 12.8px; background: var(--surface-2);
+  border: 1px solid var(--rule); border-radius: 7px; padding: 9px 11px; margin: 0;
+  min-height: 44px; max-height: 150px; overflow: auto; white-space: pre-wrap;
+  color: var(--ink-2);
+}
+.console:empty::after { content: "아직 출력 없음"; color: var(--faint); }
+
+/* 범례 / 각주 */
+.legend {
+  margin-top: 22px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center;
+  font-size: 13px; color: var(--muted); padding: 14px 16px;
+  background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius);
+}
+.legend .item { display: inline-flex; align-items: center; gap: 7px; }
+.legend .sw { width: 15px; height: 15px; border-radius: 4px; border: 1px solid var(--rule-strong); }
+.legend .sw.cur { background: var(--point-soft); border-color: var(--point-line); border-left: 4px solid var(--point); }
+.legend .sw.chg { background: var(--point-soft); border-color: var(--point-line); }
+.legend .sw.err { background: var(--bad-soft); border-color: var(--bad); }
+
+details.syntax { margin-top: 14px; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: 12px 16px; font-size: 13.5px; color: var(--muted); }
+details.syntax summary { cursor: pointer; color: var(--ink-2); font-weight: 500; }
+details.syntax ul { margin: 10px 0 0; padding-left: 18px; }
+details.syntax code { font-family: var(--mono); font-size: 12.5px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--rule); }
+
+footer.foot { margin-top: 26px; font-size: 12.5px; color: var(--faint); text-align: center; }
+
+@media (max-width: 980px) {
+  .lanes { grid-template-columns: 1fr; }
+  .code { max-height: 38vh; }
+  .transport { position: static; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <span class="eyebrow">step through · c++ / python</span>
+      <h1>이름이 생기는 순간</h1>
+      <p class="tagline">
+        중단점을 어디에 찍느냐에 따라 값이 달라 보이는 이유를 그대로 재현합니다.
+        <b>왼쪽 C++</b>은 컴파일러가 위에서 아래로 읽으며 그 자리에서 이름을 확인하고,
+        <b>오른쪽 파이썬은</b> 그 줄이 실제로 실행될 때 이름을 찾습니다.
+      </p>
+    </div>
+    <button class="theme-btn" id="themeBtn" type="button">화면 전환</button>
+  </header>
+
+  <section class="scenario">
+    <nav class="tabs" id="tabs" aria-label="예제 선택"></nav>
+    <div class="brief">
+      <h2 id="brTitle"></h2>
+      <p class="lede" id="brLede"></p>
+      <p class="point" id="brPoint"></p>
+    </div>
+  </section>
+
+  <div class="transport">
+    <button class="btn" id="btnFirst" type="button">처음으로</button>
+    <button class="btn" id="btnPrev" type="button">이전</button>
+    <button class="btn primary" id="btnNext" type="button">다음</button>
+    <button class="btn" id="btnEnd" type="button">끝까지</button>
+    <span class="spacer"></span>
+    <span class="hint"><span class="kbd">←</span> <span class="kbd">→</span> 키로도 넘어갑니다</span>
+  </div>
+
+  <main class="lanes">
+    <section class="lane" id="lane-cpp">
+      <div class="lane-head">
+        <span class="chip-lang">C++</span>
+        <span class="lane-status" id="status-cpp"></span>
+        <span class="grow"></span>
+        <button class="mini wide" type="button" data-edit="cpp">편집</button>
+        <button class="mini" type="button" data-step="cpp" data-delta="-1" aria-label="C++ 이전 단계">‹</button>
+        <span class="counter" id="counter-cpp"></span>
+        <button class="mini" type="button" data-step="cpp" data-delta="1" aria-label="C++ 다음 단계">›</button>
+      </div>
+      <div class="progress"><i id="bar-cpp" style="width:0%"></i></div>
+      <div class="code" id="code-cpp"></div>
+      <textarea class="editor hidden" id="edit-cpp" spellcheck="false" aria-label="C++ 코드"></textarea>
+      <div id="banner-cpp"></div>
+      <div class="explain" id="explain-cpp" aria-live="polite"></div>
+      <div class="panel">
+        <div class="panel-title">지역 / 스코프 상태</div>
+        <div id="vars-cpp"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">출력</div>
+        <pre class="console" id="out-cpp"></pre>
+      </div>
+    </section>
+
+    <section class="lane" id="lane-py">
+      <div class="lane-head">
+        <span class="chip-lang">Python</span>
+        <span class="lane-status" id="status-py"></span>
+        <span class="grow"></span>
+        <button class="mini wide" type="button" data-edit="py">편집</button>
+        <button class="mini" type="button" data-step="py" data-delta="-1" aria-label="파이썬 이전 단계">‹</button>
+        <span class="counter" id="counter-py"></span>
+        <button class="mini" type="button" data-step="py" data-delta="1" aria-label="파이썬 다음 단계">›</button>
+      </div>
+      <div class="progress"><i id="bar-py" style="width:0%"></i></div>
+      <div class="code" id="code-py"></div>
+      <textarea class="editor hidden" id="edit-py" spellcheck="false" aria-label="파이썬 코드"></textarea>
+      <div id="banner-py"></div>
+      <div class="explain" id="explain-py" aria-live="polite"></div>
+      <div class="panel">
+        <div class="panel-title">네임스페이스 상태</div>
+        <div id="vars-py"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">출력</div>
+        <pre class="console" id="out-py"></pre>
+      </div>
+    </section>
+  </main>
+
+  <div class="legend">
+    <span class="item"><span class="sw cur"></span> 다음에 실행할 줄 (아직 실행 전)</span>
+    <span class="item"><span class="sw chg"></span> 직전 단계에서 값이 바뀐 변수</span>
+    <span class="item"><span class="sw err"></span> 여기서 멈춤</span>
+  </div>
+
+  <details class="syntax">
+    <summary>내 코드를 붙여넣으려면 — 지원하는 문법 범위</summary>
+    <p>레인 오른쪽 위 <b>편집</b>을 누르면 코드를 직접 붙여넣을 수 있습니다. 실제 컴파일러/인터프리터가 아니라 학습용 축소 실행기라, 아래 범위까지 다룹니다.</p>
+    <ul>
+      <li><b>공통</b> — 변수, 산술·비교·논리 연산, <code>if / else</code>, <code>while</code>, <code>for</code>, 함수 정의와 호출, 재귀</li>
+      <li><b>C++</b> — <code>int double bool string</code>, 선언·초기화, 블록 스코프 <code>{ }</code>, <code>cout &lt;&lt; ... &lt;&lt; endl</code>, <code>(double)x</code>·<code>static_cast</code>, <code>++ -- += -=</code>. <code>#include</code>와 <code>using namespace std;</code>는 읽고 넘어갑니다.</li>
+      <li><b>Python</b> — 대입, <code>def</code>, <code>print</code>, <code>range len int float str abs</code>, 리스트 리터럴과 인덱싱, <code>global</code>, <code>//</code></li>
+      <li><b>아직 안 되는 것</b> — 클래스, 포인터·참조, 배열, 템플릿, 예외, import, 딕셔너리, 슬라이싱, f-string</li>
+    </ul>
+    <p>C++ 쪽은 <code>main()</code>이 있으면 전역 초기화 뒤 <code>main()</code>부터 실행하고, 없으면 위에서부터 그대로 실행합니다.</p>
+  </details>
+
+  <footer class="foot">PolarRunner · Tools / CodeStateViewer — 실행 순서와 이름 바인딩 학습용</footer>
+</div>
+<script src="engine.js"></script>
+<script src="examples.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
